@@ -1,0 +1,21 @@
+# Melos manages the Dart/Flutter packages in this monorepo.
+# Install: dart pub global activate melos
+# Bootstrap all packages: melos bootstrap
+name: korshi
+
+packages:
+  - apps/**
+  - packages/**
+
+scripts:
+  analyze:
+    run: melos exec -- "flutter analyze"
+    description: Run `flutter analyze` in every package.
+
+  test:
+    run: melos exec --dir-exists=test -- "flutter test"
+    description: Run tests in every package that has a test/ dir.
+
+  get:
+    run: melos exec -- "flutter pub get"
+    description: Run `flutter pub get` everywhere.

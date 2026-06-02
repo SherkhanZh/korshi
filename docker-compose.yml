@@ -1,0 +1,27 @@
+# Korshi — production stack (single Ubuntu host, HTTP on port 80).
+#   web : nginx serving the built admin panel + reverse-proxying /api → api
+#   api : Express/TS backend
+#
+# Bring up:  docker compose up -d --build
+services:
+  api:
+    build: ./server
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    expose:
+      - "3000"
+    volumes:
+      - korshi_uploads:/app/uploads
+
+  web:
+    build: ./web/admin_panel
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+
+volumes:
+  korshi_uploads:

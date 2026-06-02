@@ -1,0 +1,36 @@
+# ─── Monorepo root .gitignore ───
+# Each sub-project (e.g. apps/client) also has its own .gitignore.
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# ─── Flutter / Dart (root-level orphan artifacts) ───
+.dart_tool/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+pubspec_overrides.yaml
+
+# ─── Node (admin_panel / server if JS) ───
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+
+# ─── Python (server if Python) ───
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# ─── Logs ───
+*.log

@@ -1,0 +1,7 @@
+include: package:flutter_lints/flutter.yaml
+
+linter:
+  rules:
+    # Mockup MVP — relax a couple of rules that are noisy for static UI work.
+    prefer_const_constructors: false
+    use_build_context_synchronously: false
