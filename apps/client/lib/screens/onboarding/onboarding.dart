@@ -9,6 +9,21 @@ import '../main_shell.dart';
 //   Welcome (phone) → Invite code → Secure access → Connected → MainShell
 // ─────────────────────────────────────────────────────────────────────────
 
+const _phoneStyle = TextStyle(
+  fontSize: 20,
+  fontWeight: FontWeight.w600,
+  color: AppColors.textPrimary,
+);
+
+/// Fixed bottom action bar so the primary button sits at the screen bottom.
+Widget _bottomBar(Widget button) => SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+        child: button,
+      ),
+    );
+
 Widget _headerImage(BuildContext context, {double height = 300, bool showBack = false}) {
   return SizedBox(
     height: height,
@@ -53,45 +68,6 @@ Widget _headerImage(BuildContext context, {double height = 300, bool showBack = 
   );
 }
 
-Widget _chairmanFooter(BuildContext context, String question) {
-  return Container(
-    padding: const EdgeInsets.all(14),
-    decoration: BoxDecoration(
-      color: AppColors.surfaceMuted,
-      borderRadius: BorderRadius.circular(16),
-    ),
-    child: Row(
-      children: [
-        Container(
-          width: 44,
-          height: 44,
-          decoration: const BoxDecoration(color: AppColors.surface, shape: BoxShape.circle),
-          child: const Icon(Icons.headset_mic_rounded, color: AppColors.primary, size: 22),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(question, style: AppTheme.body),
-              const SizedBox(height: 2),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: const [
-                  Text('Связаться с председателем',
-                      style: TextStyle(
-                          color: AppColors.primary, fontWeight: FontWeight.w700)),
-                  Icon(Icons.chevron_right_rounded, color: AppColors.primary, size: 18),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
 // ─── 1. Welcome (phone) ───
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
@@ -99,14 +75,17 @@ class WelcomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: ListView(
+      body: Column(
+        children: [
+          Expanded(
+            child: ListView(
         padding: EdgeInsets.zero,
         children: [
           _headerImage(context, height: 300),
           Transform.translate(
             offset: const Offset(0, -24),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
               child: Column(
                 children: [
                   const Text('Добро пожаловать\nв ваш район',
@@ -151,42 +130,40 @@ class WelcomeScreen extends StatelessWidget {
                     ),
                     child: Row(
                       children: [
-                        const Text('🇰🇿', style: TextStyle(fontSize: 22)),
+                        const Text('🇰🇿', style: TextStyle(fontSize: 20)),
                         const SizedBox(width: 6),
                         const Icon(Icons.keyboard_arrow_down_rounded,
                             color: AppColors.textSecondary),
                         const SizedBox(width: 12),
-                        const Text('+7',
-                            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
-                        const SizedBox(width: 10),
+                        const Text('+7', style: _phoneStyle),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: TextField(
                             keyboardType: TextInputType.phone,
-                            style: const TextStyle(
-                                fontSize: 20, fontWeight: FontWeight.w600),
-                            decoration: const InputDecoration.collapsed(
+                            style: _phoneStyle,
+                            decoration: InputDecoration.collapsed(
                               hintText: '(___) ___ __ __',
-                              hintStyle: TextStyle(
-                                  fontSize: 20, color: AppColors.textTertiary),
+                              hintStyle:
+                                  _phoneStyle.copyWith(color: AppColors.textTertiary),
                             ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  FilledButton(
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const InviteCodeScreen()),
-                    ),
-                    child: const Text('Продолжить'),
-                  ),
-                  const SizedBox(height: 24),
-                  _chairmanFooter(context, 'Не получается войти в район?'),
                 ],
               ),
             ),
           ),
+        ],
+            ),
+          ),
+          _bottomBar(FilledButton(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const InviteCodeScreen()),
+            ),
+            child: const Text('Продолжить'),
+          )),
         ],
       ),
     );
@@ -213,14 +190,17 @@ class _InviteCodeScreenState extends State<InviteCodeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: ListView(
+      body: Column(
+        children: [
+          Expanded(
+            child: ListView(
         padding: EdgeInsets.zero,
         children: [
           _headerImage(context, height: 230, showBack: true),
           Transform.translate(
             offset: const Offset(0, -24),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -258,14 +238,15 @@ class _InviteCodeScreenState extends State<InviteCodeScreen> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  const Text('Введите код приглашения',
+                  const Text('Введите код или пароль',
                       style: TextStyle(
                           fontFamily: AppTheme.displayFont,
                           fontWeight: FontWeight.w700,
                           color: AppColors.primary,
                           fontSize: 30)),
                   const SizedBox(height: 8),
-                  const Text('Председатель района отправил вам код приглашения',
+                  const Text(
+                      'Введите одноразовый код приглашения от председателя или свой пароль, если уже задавали его.',
                       style: TextStyle(color: AppColors.textSecondary, fontSize: 15)),
                   const SizedBox(height: 18),
                   Container(
@@ -279,26 +260,29 @@ class _InviteCodeScreenState extends State<InviteCodeScreen> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.confirmation_number_outlined,
-                            color: AppColors.primary, size: 26),
+                        const Icon(Icons.vpn_key_rounded,
+                            color: AppColors.primary, size: 24),
                         const SizedBox(width: 14),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Введите код приглашения',
+                              const Text('Код или пароль',
                                   style: TextStyle(
                                       color: AppColors.textTertiary, fontSize: 13)),
+                              const SizedBox(height: 2),
                               TextField(
                                 controller: _code,
-                                textCapitalization: TextCapitalization.characters,
                                 style: const TextStyle(
                                     color: AppColors.primary,
                                     fontWeight: FontWeight.w700,
-                                    fontSize: 28,
-                                    letterSpacing: 2),
+                                    fontSize: 20),
                                 decoration: const InputDecoration.collapsed(
-                                  hintText: 'AB12-48',
+                                  hintText: 'Введите код или пароль',
+                                  hintStyle: TextStyle(
+                                      color: AppColors.textTertiary,
+                                      fontWeight: FontWeight.w500,
+                                      fontSize: 16),
                                 ),
                               ),
                             ],
@@ -349,19 +333,19 @@ class _InviteCodeScreenState extends State<InviteCodeScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  FilledButton(
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const SecureAccessScreen()),
-                    ),
-                    child: const Text('Продолжить'),
-                  ),
-                  const SizedBox(height: 20),
-                  _chairmanFooter(context, 'Не получили код приглашения?'),
                 ],
               ),
             ),
           ),
+        ],
+            ),
+          ),
+          _bottomBar(FilledButton(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const SecureAccessScreen()),
+            ),
+            child: const Text('Продолжить'),
+          )),
         ],
       ),
     );
@@ -377,21 +361,23 @@ class SecureAccessScreen extends StatefulWidget {
 }
 
 class _SecureAccessScreenState extends State<SecureAccessScreen> {
-  bool _faceId = true;
   bool _obscure1 = true;
   bool _obscure2 = true;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: ListView(
+      body: Column(
+        children: [
+          Expanded(
+            child: ListView(
         padding: EdgeInsets.zero,
         children: [
           _headerImage(context, height: 210, showBack: true),
           Transform.translate(
             offset: const Offset(0, -24),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
               child: Column(
                 children: [
                   const Text('Шаг 3 из 4',
@@ -414,81 +400,20 @@ class _SecureAccessScreenState extends State<SecureAccessScreen> {
                   const SizedBox(height: 12),
                   _passwordField('Повторите пароль', 'Введите пароль ещё раз', _obscure2,
                       () => setState(() => _obscure2 = !_obscure2)),
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceGreenTint,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.shield_rounded, color: AppColors.primary, size: 24),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
-                              Text('Ваш доступ приватен и защищён',
-                                  style: TextStyle(
-                                      color: AppColors.primary, fontWeight: FontWeight.w700)),
-                              Text('Присоединиться могут только жители района.',
-                                  style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: const [
-                        BoxShadow(color: AppColors.shadow, blurRadius: 10, offset: Offset(0, 4)),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.face_retouching_natural_rounded,
-                            color: AppColors.primary),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
-                              Text('Включить Face ID',
-                                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                              Text('Для быстрого и удобного входа',
-                                  style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
-                            ],
-                          ),
-                        ),
-                        Switch(
-                          value: _faceId,
-                          activeColor: Colors.white,
-                          activeTrackColor: AppColors.primary,
-                          onChanged: (v) => setState(() => _faceId = v),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  FilledButton.icon(
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const ConnectedScreen()),
-                    ),
-                    icon: const Icon(Icons.shield_rounded, size: 20),
-                    label: const Text('Активировать доступ'),
-                  ),
-                  const SizedBox(height: 20),
-                  _chairmanFooter(context, 'Нужна помощь со входом?'),
                 ],
               ),
             ),
           ),
+        ],
+            ),
+          ),
+          _bottomBar(FilledButton.icon(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ConnectedScreen()),
+            ),
+            icon: const Icon(Icons.shield_rounded, size: 20),
+            label: const Text('Активировать доступ'),
+          )),
         ],
       ),
     );
@@ -582,14 +507,17 @@ class ConnectedScreen extends StatelessWidget {
       (Icons.call_rounded, 'Контакты', 'Председатель и полезные службы'),
     ];
     return Scaffold(
-      body: ListView(
+      body: Column(
+        children: [
+          Expanded(
+            child: ListView(
         padding: EdgeInsets.zero,
         children: [
-          _headerImage(context, height: 250),
+          _headerImage(context, height: 190),
           Transform.translate(
             offset: const Offset(0, -24),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
               child: Column(
                 children: [
                   Container(
@@ -624,7 +552,7 @@ class ConnectedScreen extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 12),
                   const Text('Добро пожаловать в\nKok-Tobe Neighborhood',
                       textAlign: TextAlign.center,
                       style: TextStyle(
@@ -632,19 +560,19 @@ class ConnectedScreen extends StatelessWidget {
                           fontWeight: FontWeight.w700,
                           color: AppColors.primary,
                           fontSize: 28,
-                          height: 1.1)),
-                  const SizedBox(height: 8),
+                          height: 1.3)),
+                  const SizedBox(height: 12),
                   const Text('Вы подключены к приватному сообществу района',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: AppColors.textSecondary, fontSize: 15)),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 10),
                   GridView.count(
                     crossAxisCount: 2,
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     mainAxisSpacing: 12,
                     crossAxisSpacing: 12,
-                    childAspectRatio: 1.45,
+                    childAspectRatio: 1.35,
                     children: [
                       for (final f in features)
                         Container(
@@ -683,18 +611,20 @@ class ConnectedScreen extends StatelessWidget {
                         ),
                     ],
                   ),
-                  const SizedBox(height: 20),
-                  FilledButton(
-                    onPressed: () => Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(builder: (_) => const MainShell()),
-                      (route) => false,
-                    ),
-                    child: const Text('Перейти в район  →'),
-                  ),
                 ],
               ),
             ),
           ),
+        ],
+            ),
+          ),
+          _bottomBar(FilledButton(
+            onPressed: () => Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const MainShell()),
+              (route) => false,
+            ),
+            child: const Text('Перейти в район  →'),
+          )),
         ],
       ),
     );

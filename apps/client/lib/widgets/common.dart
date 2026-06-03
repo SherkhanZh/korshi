@@ -233,6 +233,7 @@ class CallWhatsAppRow extends StatelessWidget {
     }
     final s = compact ? 36.0 : 42.0;
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         _circleBtn(Icons.call_rounded, s, () => _call(context)),
         const SizedBox(width: 10),
