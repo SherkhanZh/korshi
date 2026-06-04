@@ -4,8 +4,6 @@ import {
   Clock,
   QrCode,
   MapPin,
-  Check,
-  X,
   Copy,
   MessageCircle,
   Phone,
@@ -21,15 +19,10 @@ import {
 import { PageHeader } from '../components/ui/PageHeader';
 import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
-import {
-  residents as seedResidents,
-  streets,
-  community,
-  approvals as seedApprovals,
-  generateInviteCode,
-  inviteMessage,
-} from '../data/mockData';
-import type { Resident, ResidentStatus } from '../types';
+import { inviteMessage } from '../data/mockData';
+import type { Resident, ResidentStatus, Street } from '../types';
+import { fetchResidents, inviteResident } from '../lib/api';
+import { useAsync } from '../lib/useAsync';
 
 function statusBadge(s: ResidentStatus) {
   switch (s) {
@@ -43,14 +36,16 @@ function statusBadge(s: ResidentStatus) {
 }
 
 export function Residents() {
-  const [items, setItems] = useState<Resident[]>(seedResidents);
-  const [approvals, setApprovals] = useState(seedApprovals);
+  const { data, loading, error, reload } = useAsync(fetchResidents, []);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<ResidentStatus | 'all'>('all');
   const [selected, setSelected] = useState<Resident | null>(null);
   const [invite, setInvite] = useState(false);
 
-  const pct = Math.round((community.connected / community.total) * 100);
+  const items: Resident[] = data?.residents ?? [];
+  const streets: Street[] = data?.streets ?? [];
+  const community = data?.community ?? { connected: 0, total: 0 };
+  const pct = community.total ? Math.round((community.connected / community.total) * 100) : 0;
 
   const filtered = useMemo(
     () =>
@@ -63,6 +58,9 @@ export function Residents() {
       }),
     [items, query, statusFilter],
   );
+
+  if (loading) return <div className="p-10 text-center text-ink3">Загрузка…</div>;
+  if (error) return <div className="p-10 text-center text-[#C0492E]">{error}</div>;
 
   return (
     <div>
@@ -101,7 +99,7 @@ export function Residents() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 lg:col-span-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:col-span-2">
           <button onClick={() => setInvite(true)} className="card flex items-center gap-3 p-5 text-left transition hover:shadow-md">
             <div className="grid h-11 w-11 place-items-center rounded-xl bg-greentint text-primary">
               <UserPlus size={20} />
@@ -111,22 +109,6 @@ export function Residents() {
               <p className="text-xs text-ink3">Добавить жителя</p>
             </div>
           </button>
-          <div className="card flex items-center gap-3 p-5">
-            <div className="grid h-11 w-11 place-items-center rounded-xl bg-[#FBEFD6] text-[#C9881C]">
-              <Clock size={20} />
-            </div>
-            <div>
-              <p className="font-semibold">
-                Одобрения{' '}
-                {approvals.length > 0 && (
-                  <span className="ml-1 rounded-full bg-[#C9881C] px-1.5 text-xs text-white">
-                    {approvals.length}
-                  </span>
-                )}
-              </p>
-              <p className="text-xs text-ink3">Заявки на вступление</p>
-            </div>
-          </div>
           <div className="card flex items-center gap-3 p-5">
             <div className="grid h-11 w-11 place-items-center rounded-xl bg-greentint text-primary">
               <QrCode size={20} />
@@ -154,7 +136,7 @@ export function Residents() {
       </h3>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {streets.map((s) => {
-          const p = Math.round((s.connected / s.total) * 100);
+          const p = s.total ? Math.round((s.connected / s.total) * 100) : 0;
           return (
             <div key={s.id} className="card p-4">
               <div className="flex items-center justify-between">
@@ -171,43 +153,6 @@ export function Residents() {
           );
         })}
       </div>
-
-      {/* Pending approvals */}
-      {approvals.length > 0 && (
-        <>
-          <h3 className="mb-3 mt-8 flex items-center gap-2 font-semibold">
-            <Clock size={16} className="text-[#C9881C]" /> Заявки на одобрение
-            <span className="rounded-full bg-[#C9881C] px-1.5 text-xs text-white">{approvals.length}</span>
-          </h3>
-          <div className="card divide-y divide-line/60">
-            {approvals.map((a) => (
-              <div key={a.id} className="flex items-center gap-3 px-5 py-3.5">
-                <div className="grid h-10 w-10 place-items-center rounded-full bg-muted text-sm font-semibold text-ink2">
-                  {a.initials}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium">{a.name}</p>
-                  <p className="text-xs text-ink3">
-                    {a.address} · {a.joinedAgo}
-                  </p>
-                </div>
-                <button
-                  onClick={() => setApprovals((p) => p.filter((x) => x.id !== a.id))}
-                  className="flex items-center gap-1 rounded-lg bg-greentint px-3 py-1.5 text-sm font-semibold text-primary hover:bg-[#e0ebe1]"
-                >
-                  <Check size={15} /> Одобрить
-                </button>
-                <button
-                  onClick={() => setApprovals((p) => p.filter((x) => x.id !== a.id))}
-                  className="flex items-center gap-1 rounded-lg bg-[#FBE6E1] px-3 py-1.5 text-sm font-semibold text-[#C0492E] hover:bg-[#f7d8d1]"
-                >
-                  <X size={15} /> Отклонить
-                </button>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
 
       {/* Residents list */}
       <div className="mb-3 mt-8 flex items-center justify-between">
@@ -255,12 +200,15 @@ export function Residents() {
             {statusBadge(r.status)}
           </div>
         ))}
+        {filtered.length === 0 && (
+          <div className="px-5 py-8 text-center text-ink3">Жителей нет</div>
+        )}
       </div>
 
       {invite && (
         <InviteModal
           onClose={() => setInvite(false)}
-          onCreated={(r) => setItems((prev) => [r, ...prev])}
+          onCreated={reload}
         />
       )}
       <ResidentDetail resident={selected} onClose={() => setSelected(null)} />
@@ -274,15 +222,17 @@ function InviteModal({
   onCreated,
 }: {
   onClose: () => void;
-  onCreated: (r: Resident) => void;
+  onCreated: () => void;
 }) {
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [name, setName] = useState('');
-  const [code] = useState(generateInviteCode());
+  const [code, setCode] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
   const [copied, setCopied] = useState(false);
 
-  const msg = inviteMessage(address || '—', code);
+  const msg = inviteMessage(address || '—', code || '••••-••');
 
   const copy = (text: string) => {
     navigator.clipboard?.writeText(text);
@@ -290,22 +240,19 @@ function InviteModal({
     setTimeout(() => setCopied(false), 1500);
   };
 
-  const save = () => {
-    if (!phone.trim() || !address.trim()) return;
-    const initials = name.trim()
-      ? name.trim().split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
-      : '—';
-    onCreated({
-      id: `res${Date.now()}`,
-      name: name.trim() || '—',
-      initials,
-      phone,
-      address,
-      street: address.split(',')[0] || '',
-      status: 'invited',
-      inviteCode: code,
-    });
-    onClose();
+  const create = async () => {
+    if (!phone.trim() || !address.trim() || busy) return;
+    setBusy(true);
+    setErr('');
+    try {
+      const r = await inviteResident({ phone: phone.trim(), address: address.trim(), name: name.trim() || undefined });
+      setCode(r.activationCode);
+      onCreated();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Не удалось создать приглашение');
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -313,56 +260,66 @@ function InviteModal({
       <div className="space-y-4">
         <div>
           <label className="label">Номер телефона *</label>
-          <input className="input" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+7 7__ ___ __ __" />
+          <input className="input" value={phone} disabled={!!code} onChange={(e) => setPhone(e.target.value)} placeholder="+7 7__ ___ __ __" />
         </div>
         <div>
           <label className="label">Адрес *</label>
-          <input className="input" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="ул. Абая, 27" />
+          <input className="input" value={address} disabled={!!code} onChange={(e) => setAddress(e.target.value)} placeholder="ул. Абая, 27" />
         </div>
         <div>
           <label className="label">Имя жителя (необязательно)</label>
-          <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Даулет С." />
+          <input className="input" value={name} disabled={!!code} onChange={(e) => setName(e.target.value)} placeholder="Даулет С." />
         </div>
 
-        {/* Code */}
-        <div className="flex items-center justify-between rounded-xl border border-line bg-greentint p-3">
-          <div className="flex items-center gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-lg bg-primary text-white">
-              <KeyRound size={18} />
-            </div>
-            <div>
-              <p className="text-xs text-ink2">Код активации (создан автоматически)</p>
-              <p className="font-mono text-2xl font-bold tracking-widest text-primary">{code}</p>
-            </div>
-          </div>
-          <div className="text-right">
-            <p className="text-xs text-ink3">Код не истекает</p>
-            <button onClick={() => copy(code)} className="mt-1 inline-flex items-center gap-1 text-sm font-semibold text-primary">
-              <Copy size={14} /> {copied ? 'Скопировано' : 'Копировать'}
-            </button>
-          </div>
-        </div>
+        {err && <p className="rounded-lg bg-[#FBE6E1] px-3 py-2 text-sm text-[#C0492E]">{err}</p>}
 
-        {/* WhatsApp preview */}
-        <div>
-          <label className="label">Предпросмотр приглашения (WhatsApp)</label>
-          <div className="rounded-xl bg-greentint p-3 text-sm text-ink2 whitespace-pre-line">{msg}</div>
-        </div>
-
-        <div className="space-y-2">
-          <a
-            href={`https://wa.me/?text=${encodeURIComponent(msg)}`}
-            target="_blank"
-            rel="noreferrer"
-            onClick={save}
-            className="btn-primary w-full !bg-[#25D366] hover:!bg-[#1eb958]"
-          >
-            <MessageCircle size={16} /> Отправить через WhatsApp
-          </a>
-          <button onClick={() => { copy(msg); save(); }} className="btn-ghost w-full">
-            <Copy size={16} /> Скопировать приглашение
+        {!code ? (
+          <button className="btn-primary w-full" onClick={create} disabled={busy || !phone.trim() || !address.trim()}>
+            <KeyRound size={16} /> {busy ? 'Создаём…' : 'Создать код активации'}
           </button>
-        </div>
+        ) : (
+          <>
+            {/* Code */}
+            <div className="flex items-center justify-between rounded-xl border border-line bg-greentint p-3">
+              <div className="flex items-center gap-3">
+                <div className="grid h-10 w-10 place-items-center rounded-lg bg-primary text-white">
+                  <KeyRound size={18} />
+                </div>
+                <div>
+                  <p className="text-xs text-ink2">Код активации (создан сервером)</p>
+                  <p className="font-mono text-2xl font-bold tracking-widest text-primary">{code}</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-ink3">Код не истекает</p>
+                <button onClick={() => copy(code)} className="mt-1 inline-flex items-center gap-1 text-sm font-semibold text-primary">
+                  <Copy size={14} /> {copied ? 'Скопировано' : 'Копировать'}
+                </button>
+              </div>
+            </div>
+
+            {/* WhatsApp preview */}
+            <div>
+              <label className="label">Предпросмотр приглашения (WhatsApp)</label>
+              <div className="rounded-xl bg-greentint p-3 text-sm text-ink2 whitespace-pre-line">{msg}</div>
+            </div>
+
+            <div className="space-y-2">
+              <a
+                href={`https://wa.me/?text=${encodeURIComponent(msg)}`}
+                target="_blank"
+                rel="noreferrer"
+                className="btn-primary w-full !bg-[#25D366] hover:!bg-[#1eb958]"
+              >
+                <MessageCircle size={16} /> Отправить через WhatsApp
+              </a>
+              <button onClick={() => copy(msg)} className="btn-ghost w-full">
+                <Copy size={16} /> Скопировать приглашение
+              </button>
+              <button onClick={onClose} className="btn-ghost w-full">Готово</button>
+            </div>
+          </>
+        )}
       </div>
     </Modal>
   );

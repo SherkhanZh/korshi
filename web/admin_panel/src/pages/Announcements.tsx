@@ -1,10 +1,16 @@
-import { useState } from 'react';
-import { Plus, Pin, Eye, Zap, CalendarClock, Users, Home, MapPin } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Plus, Pin, Eye, Zap, CalendarClock, Users, Home, MapPin, Trash2 } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Modal } from '../components/ui/Modal';
-import { announcements as seed } from '../data/mockData';
 import { announcementTypeMeta } from '../lib/meta';
 import type { Announcement, AnnouncementType, Audience } from '../types';
+import {
+  fetchAnnouncements,
+  createAnnouncement,
+  pinAnnouncement,
+  deleteAnnouncement,
+} from '../lib/api';
+import { useAsync } from '../lib/useAsync';
 
 const TYPES = Object.keys(announcementTypeMeta) as AnnouncementType[];
 
@@ -15,14 +21,20 @@ const AUDIENCES: { key: Audience; label: string; sub: string; icon: typeof Users
 ];
 
 export function Announcements() {
-  const [items, setItems] = useState<Announcement[]>(seed);
+  const { data, loading, error, reload } = useAsync(fetchAnnouncements, []);
+  const [items, setItems] = useState<Announcement[]>([]);
   const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   const [type, setType] = useState<AnnouncementType>('maintenance');
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
   const [publishNow, setPublishNow] = useState(true);
   const [audience, setAudience] = useState<Audience>('all');
+
+  useEffect(() => {
+    if (data) setItems(data);
+  }, [data]);
 
   const reset = () => {
     setType('maintenance');
@@ -32,30 +44,43 @@ export function Announcements() {
     setAudience('all');
   };
 
-  const publish = () => {
-    if (!title.trim()) return;
+  const publish = async () => {
+    if (!title.trim() || busy) return;
     const audLabel = AUDIENCES.find((a) => a.key === audience)!.label;
-    setItems((prev) => [
-      {
-        id: `a${Date.now()}`,
-        type,
-        title,
-        message,
-        publishNow,
-        audience,
-        audienceLabel: audLabel,
-        date: publishNow ? 'только что' : 'запланировано',
-        seenBy: 0,
-        pinned: false,
-      },
-      ...prev,
-    ]);
-    reset();
-    setOpen(false);
+    setBusy(true);
+    try {
+      await createAnnouncement({ type, title, message, audience, audienceLabel: audLabel, publishNow });
+      reset();
+      setOpen(false);
+      reload();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Не удалось опубликовать');
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const togglePin = (id: string) =>
-    setItems((prev) => prev.map((a) => (a.id === id ? { ...a, pinned: !a.pinned } : a)));
+  const togglePin = async (a: Announcement) => {
+    setItems((prev) => prev.map((x) => (x.id === a.id ? { ...x, pinned: !x.pinned } : x)));
+    try {
+      await pinAnnouncement(a.id, !a.pinned);
+    } catch {
+      reload();
+    }
+  };
+
+  const remove = async (id: string) => {
+    if (!confirm('Удалить это объявление?')) return;
+    setItems((prev) => prev.filter((a) => a.id !== id));
+    try {
+      await deleteAnnouncement(id);
+    } catch {
+      reload();
+    }
+  };
+
+  if (loading) return <div className="p-10 text-center text-ink3">Загрузка…</div>;
+  if (error) return <div className="p-10 text-center text-[#C0492E]">{error}</div>;
 
   return (
     <div>
@@ -95,12 +120,20 @@ export function Announcements() {
                 <span className="flex items-center gap-1.5 text-xs text-ink3">
                   <Eye size={14} /> {a.seenBy} просмотров
                 </span>
-                <button
-                  onClick={() => togglePin(a.id)}
-                  className="text-xs font-semibold text-primary hover:underline"
-                >
-                  {a.pinned ? 'Открепить' : 'Закрепить'}
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => togglePin(a)}
+                    className="text-xs font-semibold text-primary hover:underline"
+                  >
+                    {a.pinned ? 'Открепить' : 'Закрепить'}
+                  </button>
+                  <button
+                    onClick={() => remove(a.id)}
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-[#C0492E] hover:underline"
+                  >
+                    <Trash2 size={13} /> Удалить
+                  </button>
+                </div>
               </div>
             </div>
           );

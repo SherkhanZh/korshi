@@ -1,0 +1,23 @@
+process.env.KORSHI_NO_LISTEN='1';
+const { app } = await import('./dist/index.js');
+const srv = app.listen(0); await new Promise(r=>srv.once('listening',r));
+const base='http://127.0.0.1:'+srv.address().port; let pass=0,fail=0;
+const ok=(c,m)=>{c?pass++:(fail++,console.log('FAIL:',m))}; const J=r=>r.json();
+const AT=(await J(await fetch(base+'/api/auth/admin/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:'admin@korshi.kz',password:'admin123'})}))).token;
+const rl=await J(await fetch(base+'/api/auth/resident/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({phone:'+77771234567',secret:'AB12-48'})}));
+const RH={authorization:'Bearer '+rl.token};
+const polls=await J(await fetch(base+'/api/polls',{headers:RH}));
+ok(polls.active.id && typeof polls.active.id==='string','active poll has id');
+ok(polls.active.options.every(o=>typeof o.id==='number' && o.id>0),'options have numeric ids');
+const oid=polls.active.options[1].id;
+let v=await fetch(base+'/api/polls/'+polls.active.id+'/vote',{method:'POST',headers:{...RH,'content-type':'application/json'},body:JSON.stringify({optionId:oid})});
+ok(v.status===200,'vote by id ok');
+const after=await J(await fetch(base+'/api/polls',{headers:RH}));
+ok(after.active.voted===true,'voted reflected');
+ok(after.active.options.find(o=>o.id===oid).votes===polls.active.options.find(o=>o.id===oid).votes+1,'vote tally incremented');
+// switch vote
+const oid0=polls.active.options[0].id;
+await fetch(base+'/api/polls/'+polls.active.id+'/vote',{method:'POST',headers:{...RH,'content-type':'application/json'},body:JSON.stringify({optionId:oid0})});
+const after2=await J(await fetch(base+'/api/polls',{headers:RH}));
+ok(after2.active.options.find(o=>o.id===oid).votes===polls.active.options.find(o=>o.id===oid).votes,'switching vote moved the tally back');
+srv.close(); console.log(`RESULT: ${pass} passed, ${fail} failed`); process.exit(fail?1:0);

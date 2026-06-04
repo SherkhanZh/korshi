@@ -1,0 +1,10 @@
+const m = await import('./dist/db.js');
+const { db, seed, setting } = m;
+seed();
+const c = t => db.prepare(`SELECT COUNT(*) n FROM ${t}`).get().n;
+console.log('counts:', {admins:c('admins'),residents:c('residents'),reports:c('reports'),anns:c('announcements'),polls:c('polls'),options:c('poll_options'),decisions:c('decisions'),contacts:c('contacts'),streets:c('streets')});
+console.log('neighborhood:', setting('neighborhood'));
+const bcrypt=(await import('bcryptjs')).default;
+const a=db.prepare('SELECT * FROM admins').get();
+console.log('admin pw:', bcrypt.compareSync('admin123', a.password_hash));
+seed(); console.log('idempotent residents:', c('residents'));

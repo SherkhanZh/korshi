@@ -285,18 +285,21 @@ class ContactItem {
 /// A poll option (active poll).
 class PollOption {
   const PollOption({
+    required this.id,
     required this.label,
     required this.pct,
     required this.votes,
     required this.positive,
   });
 
+  final int id;
   final String label;
   final int pct;
   final int votes;
   final bool positive;
 
   factory PollOption.fromJson(Map<String, dynamic> j) => PollOption(
+        id: (j['id'] as num?)?.toInt() ?? 0,
         label: j['label'] as String? ?? '',
         pct: j['pct'] as int? ?? 0,
         votes: j['votes'] as int? ?? 0,
@@ -306,6 +309,7 @@ class PollOption {
 
 class ActivePoll {
   const ActivePoll({
+    required this.id,
     required this.question,
     required this.description,
     required this.options,
@@ -314,6 +318,7 @@ class ActivePoll {
     required this.voted,
   });
 
+  final String id;
   final String question;
   final String description;
   final List<PollOption> options;
@@ -322,6 +327,7 @@ class ActivePoll {
   final bool voted;
 
   factory ActivePoll.fromJson(Map<String, dynamic> j) => ActivePoll(
+        id: j['id'] as String? ?? '',
         question: j['question'] as String? ?? '',
         description: j['description'] as String? ?? '',
         options: ((j['options'] as List?) ?? [])

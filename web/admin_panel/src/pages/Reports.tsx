@@ -1,23 +1,22 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import {
   MapPin,
   User,
   Clock,
-  AlertTriangle,
   CheckCircle2,
   MessageSquare,
   HardHat,
   Phone,
-  Camera,
   RefreshCw,
-  Image as ImageIcon,
 } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
-import { reports as seed, contractors } from '../data/mockData';
+import { contractors } from '../data/mockData';
 import { categoryMeta, reportStatusMeta } from '../lib/meta';
 import type { Category, Report, ReportStatus, ReportStage } from '../types';
+import { fetchReports, patchReport, addReportUpdate } from '../lib/api';
+import { useAsync } from '../lib/useAsync';
 
 const TABS: { key: ReportStatus; label: string }[] = [
   { key: 'new', label: 'Новые' },
@@ -35,10 +34,16 @@ const QUICK_UPDATES: { stage: ReportStage; label: string; status: ReportStatus }
 ];
 
 export function Reports() {
-  const [items, setItems] = useState<Report[]>(seed);
+  const { data, loading, error, setData } = useAsync(fetchReports, []);
+  const [items, setItems] = useState<Report[]>([]);
   const [tab, setTab] = useState<ReportStatus>('new');
-  const [cat, setCat] = useState<Category | 'urgent' | null>(null);
+  const [cat, setCat] = useState<Category | null>(null);
   const [selected, setSelected] = useState<Report | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (data) setItems(data);
+  }, [data]);
 
   const counts = useMemo(() => {
     const c: Record<ReportStatus, number> = { new: 0, inProgress: 0, waitingCity: 0, resolved: 0 };
@@ -46,26 +51,38 @@ export function Reports() {
     return c;
   }, [items]);
 
-  const urgent = items.find((r) => r.urgent && r.status !== 'resolved');
-
   const filtered = items.filter((r) => {
     if (r.status !== tab) return false;
-    if (cat === 'urgent') return r.urgent;
     if (cat) return r.category === cat;
     return true;
   });
 
-  const patch = (id: string, fn: (r: Report) => Report) => {
-    setItems((prev) => prev.map((r) => (r.id === id ? fn(r) : r)));
-    setSelected((cur) => (cur && cur.id === id ? fn(cur) : cur));
+  // Replace one report everywhere (list + open modal + cache).
+  const apply = (r: Report) => {
+    setItems((prev) => {
+      const next = prev.map((x) => (x.id === r.id ? r : x));
+      setData(next);
+      return next;
+    });
+    setSelected((cur) => (cur && cur.id === r.id ? r : cur));
+  };
+
+  const run = async (p: Promise<Report>) => {
+    setBusy(true);
+    try {
+      apply(await p);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Не удалось обновить заявку');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const applyStage = (r: Report, u: (typeof QUICK_UPDATES)[number]) =>
-    patch(r.id, (x) => ({
-      ...x,
-      status: u.status,
-      timeline: [...x.timeline, { time: 'только что', title: u.label, done: u.status === 'resolved' }],
-    }));
+    run(patchReport(r.id, { status: u.status }).then(() => addReportUpdate(r.id, u.label)));
+
+  if (loading) return <div className="p-10 text-center text-ink3">Загрузка…</div>;
+  if (error) return <div className="p-10 text-center text-[#C0492E]">{error}</div>;
 
   return (
     <div>
@@ -113,38 +130,7 @@ export function Reports() {
             </button>
           );
         })}
-        <button
-          onClick={() => setCat(cat === 'urgent' ? null : 'urgent')}
-          className="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition"
-          style={{
-            borderColor: cat === 'urgent' ? '#C0492E' : '#E6E5DF',
-            color: cat === 'urgent' ? '#C0492E' : '#6E6E73',
-            backgroundColor: cat === 'urgent' ? '#FBE6E1' : '#fff',
-          }}
-        >
-          <AlertTriangle size={14} /> Срочные
-        </button>
       </div>
-
-      {/* Urgent highlight */}
-      {urgent && tab === 'new' && !cat && (
-        <div
-          className="mb-5 flex cursor-pointer items-center gap-4 rounded-2xl border border-[#F3DDD3] bg-[#FBEFE9] p-4"
-          onClick={() => setSelected(urgent)}
-        >
-          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#FBE6E1] text-[#C0492E]">
-            <AlertTriangle size={22} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <span className="text-xs font-bold text-[#C0492E]">СРОЧНО</span>
-            <p className="font-bold">{urgent.title}</p>
-            <p className="text-xs text-ink3">
-              {urgent.location} · {urgent.resident} · {urgent.ago}
-            </p>
-          </div>
-          <button className="btn-primary !bg-[#C0492E] hover:!bg-[#a83e26]">Ответить</button>
-        </div>
-      )}
 
       {/* Queue */}
       <div className="space-y-3">
@@ -170,26 +156,18 @@ export function Reports() {
                     {m.label}
                   </span>
                   <Badge label={st.label} bg={st.bg} fg={st.fg} />
-                  {r.urgent && (
-                    <span className="text-xs font-bold text-[#C0492E]">СРОЧНО</span>
-                  )}
                 </div>
                 <p className="mt-0.5 font-semibold">{r.title}</p>
                 <p className="text-xs text-ink3">
                   {r.location} · {r.resident} · {r.ago}
                 </p>
-                {r.needsUpdate && (
-                  <p className="mt-1 flex items-center gap-1 text-xs font-medium text-[#C9881C]">
-                    <Clock size={12} /> {r.needsUpdate}
-                  </p>
-                )}
               </div>
               <button
                 className="btn-primary shrink-0"
+                disabled={busy}
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (r.status === 'new')
-                    patch(r.id, (x) => ({ ...x, status: 'inProgress' }));
+                  if (r.status === 'new') run(patchReport(r.id, { status: 'inProgress' }));
                   else setSelected(r);
                 }}
               >
@@ -205,23 +183,15 @@ export function Reports() {
 
       <ReportDetail
         report={selected}
+        busy={busy}
         onClose={() => setSelected(null)}
         onStage={applyStage}
         onAssign={(r, c) =>
-          patch(r.id, (x) => ({
-            ...x,
-            contractor: c,
-            timeline: [...x.timeline, { time: 'только что', title: 'Назначен подрядчик', body: c, done: true }],
-          }))
+          run(patchReport(r.id, { contractor: c }).then(() => addReportUpdate(r.id, `Назначен подрядчик: ${c}`)))
         }
-        onNote={(r, note) => patch(r.id, (x) => ({ ...x, internalNote: note }))}
-        onPhoto={(r) => patch(r.id, (x) => ({ ...x, hasPhoto: true }))}
+        onNote={(r, note) => run(patchReport(r.id, { internalNote: note }))}
         onResolve={(r) =>
-          patch(r.id, (x) => ({
-            ...x,
-            status: 'resolved',
-            timeline: [...x.timeline, { time: 'только что', title: 'Решено', done: true }],
-          }))
+          run(patchReport(r.id, { status: 'resolved' }).then(() => addReportUpdate(r.id, 'Заявка решена')))
         }
       />
     </div>
@@ -230,19 +200,19 @@ export function Reports() {
 
 function ReportDetail({
   report,
+  busy,
   onClose,
   onStage,
   onAssign,
   onNote,
-  onPhoto,
   onResolve,
 }: {
   report: Report | null;
+  busy: boolean;
   onClose: () => void;
   onStage: (r: Report, u: (typeof QUICK_UPDATES)[number]) => void;
   onAssign: (r: Report, c: string) => void;
   onNote: (r: Report, note: string) => void;
-  onPhoto: (r: Report) => void;
   onResolve: (r: Report) => void;
 }) {
   const [assigning, setAssigning] = useState(false);
@@ -284,6 +254,10 @@ function ReportDetail({
           </div>
         </div>
       </div>
+
+      {report.description && (
+        <p className="mt-3 rounded-xl bg-surface p-3 text-sm text-ink2">{report.description}</p>
+      )}
 
       {/* Fast actions */}
       <div className="mt-4 grid grid-cols-4 gap-2">
@@ -332,8 +306,9 @@ function ReportDetail({
           {QUICK_UPDATES.map((u) => (
             <button
               key={u.stage}
+              disabled={busy}
               onClick={() => onStage(report, u)}
-              className="rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-ink2 transition hover:border-primary hover:text-primary"
+              className="rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-ink2 transition hover:border-primary hover:text-primary disabled:opacity-50"
             >
               {u.label}
             </button>
@@ -344,29 +319,33 @@ function ReportDetail({
       {/* Timeline */}
       <div className="mt-5">
         <p className="mb-2 text-sm font-semibold">Хронология</p>
-        <div className="space-y-0">
-          {report.timeline.map((t, i) => (
-            <div key={i} className="flex gap-3">
-              <div className="flex flex-col items-center">
-                <span
-                  className={`mt-1 grid h-4 w-4 place-items-center rounded-full ${
-                    t.done ? 'bg-primary text-white' : 'border-2 border-line bg-white'
-                  }`}
-                >
-                  {t.done && <CheckCircle2 size={10} />}
-                </span>
-                {i < report.timeline.length - 1 && (
-                  <span className="w-0.5 flex-1 bg-line" style={{ minHeight: 24 }} />
-                )}
+        {report.timeline.length === 0 ? (
+          <p className="text-sm text-ink3">Пока нет обновлений.</p>
+        ) : (
+          <div className="space-y-0">
+            {report.timeline.map((t, i) => (
+              <div key={i} className="flex gap-3">
+                <div className="flex flex-col items-center">
+                  <span
+                    className={`mt-1 grid h-4 w-4 place-items-center rounded-full ${
+                      t.done ? 'bg-primary text-white' : 'border-2 border-line bg-white'
+                    }`}
+                  >
+                    {t.done && <CheckCircle2 size={10} />}
+                  </span>
+                  {i < report.timeline.length - 1 && (
+                    <span className="w-0.5 flex-1 bg-line" style={{ minHeight: 24 }} />
+                  )}
+                </div>
+                <div className="pb-3">
+                  <p className="text-xs text-ink3">{t.time}</p>
+                  <p className="text-sm font-medium">{t.title}</p>
+                  {t.body && <p className="text-xs text-ink2">{t.body}</p>}
+                </div>
               </div>
-              <div className="pb-3">
-                <p className="text-xs text-ink3">{t.time}</p>
-                <p className="text-sm font-medium">{t.title}</p>
-                {t.body && <p className="text-xs text-ink2">{t.body}</p>}
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Internal note */}
@@ -381,16 +360,12 @@ function ReportDetail({
         />
       </div>
 
-      {/* Photo + resolve */}
-      <div className="mt-4 flex items-center gap-2">
-        <button onClick={() => onPhoto(report)} className="btn-ghost flex-1">
-          {report.hasPhoto ? <ImageIcon size={16} /> : <Camera size={16} />}
-          {report.hasPhoto ? 'Фото добавлено' : 'Загрузить фото ремонта'}
-        </button>
+      {/* Resolve */}
+      <div className="mt-4">
         <button
           onClick={() => onResolve(report)}
-          className="btn-primary flex-1"
-          disabled={report.status === 'resolved'}
+          className="btn-primary w-full"
+          disabled={busy || report.status === 'resolved'}
         >
           <CheckCircle2 size={16} /> Отметить решённой
         </button>

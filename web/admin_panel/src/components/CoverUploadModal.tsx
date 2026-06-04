@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { ImageUp, Check } from 'lucide-react';
 import { Modal } from './ui/Modal';
+import { uploadCover, ApiError } from '../lib/api';
 
 export function CoverUploadModal({ onClose }: { onClose: () => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -23,21 +24,11 @@ export function CoverUploadModal({ onClose }: { onClose: () => void }) {
     setBusy(true);
     setError(null);
     try {
-      const body = new FormData();
-      body.append('image', file);
-      const res = await fetch('/api/neighborhood/cover', { method: 'POST', body });
-      if (!res.ok) {
-        if (res.status === 404) {
-          throw new Error('Сервер не обновлён (нет эндпоинта загрузки). Передеплойте бэкенд.');
-        }
-        if (res.status === 413) {
-          throw new Error('Файл слишком большой.');
-        }
-        throw new Error(`Ошибка сервера (${res.status}).`);
-      }
+      await uploadCover(file);
       setDone(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Не удалось загрузить.');
+      if (e instanceof ApiError && e.status === 413) setError('Файл слишком большой.');
+      else setError(e instanceof Error ? e.message : 'Не удалось загрузить.');
     } finally {
       setBusy(false);
     }

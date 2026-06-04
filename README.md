@@ -24,11 +24,23 @@ ksk/
 
 | Path                | What it is                              | Status        |
 |---------------------|-----------------------------------------|---------------|
-| `apps/client`       | Resident Flutter app                    | ✅ In progress |
+| `apps/client`       | Resident Flutter app                    | ✅ Live data   |
 | `apps/admin_app`    | Chairman Flutter app                    | 🔲 Planned    |
-| `web/admin_panel`   | Web admin panel (super-admin / ops)     | 🔲 Planned    |
-| `server`            | Backend API (Node + Express + TS)       | ✅ Skeleton    |
+| `web/admin_panel`   | Web admin panel (React + Vite)          | ✅ Live data   |
+| `server`            | Backend API (Node + Express + SQLite)   | ✅ Persistent  |
 | `packages/shared`   | Models, theme tokens, l10n shared by apps| 🔲 Planned    |
+
+## Accounts
+
+The backend seeds one admin and a few residents on first boot.
+
+- **Admin panel:** `admin@korshi.kz` / `admin123`
+- **Resident app:** phone `+7 777 123 45 67`, invite code `AB12-48`
+  (residents log in with phone + invite code; they may set a personal password,
+  and the invite code keeps working as a password until they do).
+
+Auth uses JWTs. Set `JWT_SECRET` in production (see `docker-compose.yml`).
+Data persists in SQLite on the `korshi_data` Docker volume.
 
 ## Deployment
 

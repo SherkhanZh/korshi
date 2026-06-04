@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../app_state.dart';
 import '../l10n/app_localizations.dart';
 import '../models/models.dart';
+import '../services/api_client.dart';
 import '../services/repository.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
@@ -29,6 +31,7 @@ class _PollsScreenState extends State<PollsScreen> {
           ScreenHeader(title: l.pollsTitle, subtitle: l.pollsSubtitle),
           Expanded(
             child: AsyncView<PollsData>(
+              refresh: dataVersion,
               create: () => repository.polls(),
               builder: (context, d) => ListView(
                 padding: const EdgeInsets.only(bottom: 24),
@@ -207,7 +210,7 @@ class _PollsScreenState extends State<PollsScreen> {
                           fontSize: 14)),
                 ),
                 OutlinedButton(
-                  onPressed: () => _voted(context),
+                  onPressed: () => _castVote(context, poll),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.primary,
                     side: const BorderSide(color: AppColors.primary),
@@ -221,7 +224,7 @@ class _PollsScreenState extends State<PollsScreen> {
           ] else ...[
             const SizedBox(height: 12),
             FilledButton(
-              onPressed: () => _voted(context),
+              onPressed: () => _castVote(context, poll),
               style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(46)),
               child: Text(l.voteNow),
             ),
@@ -231,10 +234,21 @@ class _PollsScreenState extends State<PollsScreen> {
     );
   }
 
-  void _voted(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Ваш голос учтён')),
-    );
+  Future<void> _castVote(BuildContext context, ActivePoll poll) async {
+    if (poll.id.isEmpty || poll.options.isEmpty) return;
+    final idx = _selectedOption.clamp(0, poll.options.length - 1).toInt();
+    final option = poll.options[idx];
+    try {
+      await repository.vote(pollId: poll.id, optionId: option.id);
+      dataVersion.value++; // re-fetch the poll with updated tallies + voted state
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ваш голос учтён')),
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    }
   }
 
   void _soon(BuildContext context) {
@@ -246,10 +260,7 @@ class _PollsScreenState extends State<PollsScreen> {
   Widget _pollOption(BuildContext context, PollOption opt, int index) {
     final selected = index == _selectedOption;
     return GestureDetector(
-      onTap: () {
-        setState(() => _selectedOption = index);
-        _voted(context);
-      },
+      onTap: () => setState(() => _selectedOption = index),
       child: Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(

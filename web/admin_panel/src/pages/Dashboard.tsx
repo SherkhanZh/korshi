@@ -15,15 +15,28 @@ import {
   Calendar,
 } from 'lucide-react';
 import { useAuth } from '../auth';
-import { reports, announcements, polls } from '../data/mockData';
 import { categoryMeta } from '../lib/meta';
 import { CoverUploadModal } from '../components/CoverUploadModal';
+import { fetchReports, fetchAnnouncements, fetchPolls } from '../lib/api';
+import { useAsync } from '../lib/useAsync';
 
 export function Dashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [coverOpen, setCoverOpen] = useState(false);
   const name = (user?.split('@')[0] ?? 'Админ').replace(/^./, (c) => c.toUpperCase());
+
+  const { data } = useAsync(async () => {
+    const [reports, announcements, polls] = await Promise.all([
+      fetchReports(),
+      fetchAnnouncements(),
+      fetchPolls(),
+    ]);
+    return { reports, announcements, polls };
+  }, []);
+  const reports = data?.reports ?? [];
+  const announcements = data?.announcements ?? [];
+  const polls = data?.polls ?? [];
 
   const newReports = reports.filter((r) => r.status === 'new');
   const inProgress = reports.filter((r) => r.status === 'inProgress').length;

@@ -3,10 +3,16 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'app_state.dart';
 import 'l10n/app_localizations.dart';
+import 'screens/main_shell.dart';
 import 'screens/onboarding/onboarding.dart';
+import 'services/session.dart';
 import 'theme/app_theme.dart';
 
-void main() => runApp(const KorshiApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await loadSession();
+  runApp(const KorshiApp());
+}
 
 class KorshiApp extends StatelessWidget {
   const KorshiApp({super.key});
@@ -28,7 +34,7 @@ class KorshiApp extends StatelessWidget {
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
           ],
-          home: const WelcomeScreen(),
+          home: isLoggedIn ? const MainShell() : const WelcomeScreen(),
         );
       },
     );

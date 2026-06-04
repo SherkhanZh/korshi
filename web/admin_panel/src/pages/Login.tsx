@@ -1,19 +1,28 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
+import { ApiError } from '../lib/api';
 
 export function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState('admin@korshi.kz');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
 
-  const submit = (e: FormEvent) => {
+  const submit = async (e: FormEvent) => {
     e.preventDefault();
-    // Mock auth — accepts any non-empty credentials.
-    if (email.trim() && password.trim()) {
-      login(email.trim());
+    if (!email.trim() || !password.trim()) return;
+    setBusy(true);
+    setError('');
+    try {
+      await login(email.trim(), password);
       navigate('/');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Ошибка входа');
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -30,7 +39,7 @@ export function Login() {
 
         <h1 className="text-xl font-bold">Вход в систему</h1>
         <p className="mt-1 text-sm text-ink2">
-          Управление районами, заявками и жителями.
+          Управление районом, заявками и жителями.
         </p>
 
         <form onSubmit={submit} className="mt-6 space-y-4">
@@ -54,13 +63,16 @@ export function Login() {
               placeholder="••••••••"
             />
           </div>
-          <button type="submit" className="btn-primary w-full">
-            Войти
+          {error && (
+            <p className="rounded-lg bg-[#FBE6E1] px-3 py-2 text-sm text-[#C0492E]">{error}</p>
+          )}
+          <button type="submit" className="btn-primary w-full" disabled={busy}>
+            {busy ? 'Вход…' : 'Войти'}
           </button>
         </form>
 
         <p className="mt-4 text-center text-xs text-ink3">
-          Демо-режим: подойдут любые данные.
+          По умолчанию: admin@korshi.kz / admin123
         </p>
       </div>
     </div>

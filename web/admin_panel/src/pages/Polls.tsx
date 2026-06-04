@@ -1,24 +1,32 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Plus, Trash2, Users, Clock, Home } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
-import { polls as seed, quickPollTemplates } from '../data/mockData';
+import { quickPollTemplates } from '../data/mockData';
 import { pollStatusMeta, pollCategoryMeta } from '../lib/meta';
 import type { Poll, PollCategory } from '../types';
+import { fetchPolls, createPoll, deletePoll } from '../lib/api';
+import { useAsync } from '../lib/useAsync';
 
 const CATEGORIES = Object.keys(pollCategoryMeta) as PollCategory[];
 const DURATIONS = [3, 7, 14];
 
 export function Polls() {
-  const [items, setItems] = useState<Poll[]>(seed);
+  const { data, loading, error, reload } = useAsync(fetchPolls, []);
+  const [items, setItems] = useState<Poll[]>([]);
   const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   const [category, setCategory] = useState<PollCategory>('infrastructure');
   const [question, setQuestion] = useState('');
   const [options, setOptions] = useState<string[]>(['Да, поддерживаю', 'Не сейчас']);
   const [duration, setDuration] = useState(7);
   const [audience, setAudience] = useState<'all' | 'street'>('all');
+
+  useEffect(() => {
+    if (data) setItems(data);
+  }, [data]);
 
   const reset = () => {
     setCategory('infrastructure');
@@ -28,25 +36,39 @@ export function Polls() {
     setAudience('all');
   };
 
-  const start = () => {
-    if (!question.trim() || options.filter((o) => o.trim()).length < 2) return;
-    setItems((prev) => [
-      {
-        id: `p${Date.now()}`,
+  const remove = async (id: string) => {
+    if (!confirm('Удалить этот опрос?')) return;
+    setItems((prev) => prev.filter((p) => p.id !== id));
+    try {
+      await deletePoll(id);
+    } catch {
+      reload();
+    }
+  };
+
+  const start = async () => {
+    if (busy || !question.trim() || options.filter((o) => o.trim()).length < 2) return;
+    setBusy(true);
+    try {
+      await createPoll({
         category,
         question,
-        options: options.filter((o) => o.trim()).map((label) => ({ label, votes: 0 })),
-        status: 'active',
+        options: options.filter((o) => o.trim()),
         durationDays: duration,
         audienceLabel: audience === 'all' ? 'Весь район' : 'Улица',
-        households: 0,
-        endsAt: `через ${duration} дн.`,
-      },
-      ...prev,
-    ]);
-    reset();
-    setOpen(false);
+      });
+      reset();
+      setOpen(false);
+      reload();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Не удалось создать опрос');
+    } finally {
+      setBusy(false);
+    }
   };
+
+  if (loading) return <div className="p-10 text-center text-ink3">Загрузка…</div>;
+  if (error) return <div className="p-10 text-center text-[#C0492E]">{error}</div>;
 
   return (
     <div>
@@ -74,6 +96,13 @@ export function Polls() {
                     <cm.icon size={13} /> {cm.label}
                   </span>
                 )}
+                <button
+                  onClick={() => remove(p.id)}
+                  title="Удалить опрос"
+                  className="ml-auto grid h-8 w-8 place-items-center rounded-lg text-ink3 hover:bg-[#FBE6E1] hover:text-[#C0492E]"
+                >
+                  <Trash2 size={16} />
+                </button>
               </div>
               <h3 className="font-bold">{p.question}</h3>
               <div className="mt-3 space-y-2.5">

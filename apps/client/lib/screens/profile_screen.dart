@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import '../app_state.dart';
 import '../l10n/app_localizations.dart';
 import '../services/launchers.dart';
+import '../services/session.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
@@ -138,9 +139,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
           title: l.logout,
           subtitle: l.logoutDesc,
           danger: true,
-          onTap: () {
-            Navigator.of(context).pop(); // close the profile sheet
-            Navigator.of(context).pushAndRemoveUntil(
+          onTap: () async {
+            final nav = Navigator.of(context);
+            await clearSession();
+            nav.pop(); // close the profile sheet
+            nav.pushAndRemoveUntil(
               MaterialPageRoute(builder: (_) => const WelcomeScreen()),
               (route) => false,
             );
@@ -216,8 +219,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Sherkhan',
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
+                Text(residentName.value?.isNotEmpty == true ? residentName.value! : 'Sherkhan',
+                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 2),
                 Text(l.profileAddress, style: AppTheme.subtle),
                 Text(l.homeNeighborhood, style: AppTheme.subtle),

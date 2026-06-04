@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 
+import '../../services/api_client.dart';
+import '../../services/repository.dart';
+import '../../services/session.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_theme.dart';
 import '../main_shell.dart';
 
 // ─────────────────────────────────────────────────────────────────────────
-// Mock onboarding / login flow (no real auth yet — visual only).
-//   Welcome (phone) → Invite code → Secure access → Connected → MainShell
+// Onboarding / login flow (live resident auth).
+//   Welcome (phone) → Invite code/password → Secure access → Connected → MainShell
 // ─────────────────────────────────────────────────────────────────────────
 
 const _phoneStyle = TextStyle(
@@ -69,8 +72,35 @@ Widget _headerImage(BuildContext context, {double height = 300, bool showBack = 
 }
 
 // ─── 1. Welcome (phone) ───
-class WelcomeScreen extends StatelessWidget {
+class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
+
+  @override
+  State<WelcomeScreen> createState() => _WelcomeScreenState();
+}
+
+class _WelcomeScreenState extends State<WelcomeScreen> {
+  final _phone = TextEditingController();
+
+  @override
+  void dispose() {
+    _phone.dispose();
+    super.dispose();
+  }
+
+  void _continue() {
+    final digits = _phone.text.replaceAll(RegExp(r'\D'), '');
+    if (digits.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Введите номер телефона')),
+      );
+      return;
+    }
+    pendingPhone = '+7$digits';
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const InviteCodeScreen()),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -139,8 +169,10 @@ class WelcomeScreen extends StatelessWidget {
                         const SizedBox(width: 8),
                         Expanded(
                           child: TextField(
+                            controller: _phone,
                             keyboardType: TextInputType.phone,
                             style: _phoneStyle,
+                            onSubmitted: (_) => _continue(),
                             decoration: InputDecoration.collapsed(
                               hintText: '(___) ___ __ __',
                               hintStyle:
@@ -159,9 +191,7 @@ class WelcomeScreen extends StatelessWidget {
             ),
           ),
           _bottomBar(FilledButton(
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const InviteCodeScreen()),
-            ),
+            onPressed: _continue,
             child: const Text('Продолжить'),
           )),
         ],
@@ -179,12 +209,36 @@ class InviteCodeScreen extends StatefulWidget {
 }
 
 class _InviteCodeScreenState extends State<InviteCodeScreen> {
-  final _code = TextEditingController(text: 'AB12-48');
+  final _code = TextEditingController();
+  bool _busy = false;
 
   @override
   void dispose() {
     _code.dispose();
     super.dispose();
+  }
+
+  Future<void> _login() async {
+    final secret = _code.text.trim();
+    if (secret.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Введите код или пароль')),
+      );
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      await repository.residentLogin(phone: pendingPhone ?? '', secret: secret);
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const SecureAccessScreen()),
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   @override
@@ -221,11 +275,11 @@ class _InviteCodeScreenState extends State<InviteCodeScreen> {
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
-                              Text('Номер подтверждён',
+                            children: [
+                              const Text('Номер подтверждён',
                                   style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
-                              Text('+7 777 123 45 67',
-                                  style: TextStyle(
+                              Text(pendingPhone ?? '—',
+                                  style: const TextStyle(
                                       color: AppColors.primary,
                                       fontWeight: FontWeight.w700,
                                       fontSize: 18)),
@@ -341,10 +395,12 @@ class _InviteCodeScreenState extends State<InviteCodeScreen> {
             ),
           ),
           _bottomBar(FilledButton(
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const SecureAccessScreen()),
-            ),
-            child: const Text('Продолжить'),
+            onPressed: _busy ? null : _login,
+            child: _busy
+                ? const SizedBox(
+                    height: 22, width: 22,
+                    child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white))
+                : const Text('Продолжить'),
           )),
         ],
       ),
@@ -361,8 +417,56 @@ class SecureAccessScreen extends StatefulWidget {
 }
 
 class _SecureAccessScreenState extends State<SecureAccessScreen> {
+  final _pw1 = TextEditingController();
+  final _pw2 = TextEditingController();
   bool _obscure1 = true;
   bool _obscure2 = true;
+  bool _busy = false;
+
+  @override
+  void dispose() {
+    _pw1.dispose();
+    _pw2.dispose();
+    super.dispose();
+  }
+
+  void _toConnected() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const ConnectedScreen()),
+    );
+  }
+
+  Future<void> _activate() async {
+    final pw = _pw1.text;
+    // Password is optional — the invite code keeps working as a password.
+    if (pw.isEmpty) {
+      _toConnected();
+      return;
+    }
+    if (pw.length < 4) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Пароль должен быть не короче 4 символов')),
+      );
+      return;
+    }
+    if (pw != _pw2.text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Пароли не совпадают')),
+      );
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      await repository.setPassword(pw);
+      if (mounted) _toConnected();
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -395,11 +499,16 @@ class _SecureAccessScreenState extends State<SecureAccessScreen> {
                   const Text('Создайте пароль для входа',
                       style: TextStyle(color: AppColors.textSecondary, fontSize: 15)),
                   const SizedBox(height: 20),
-                  _passwordField('Пароль', 'Введите пароль', _obscure1,
+                  _passwordField(_pw1, 'Пароль', 'Введите пароль', _obscure1,
                       () => setState(() => _obscure1 = !_obscure1)),
                   const SizedBox(height: 12),
-                  _passwordField('Повторите пароль', 'Введите пароль ещё раз', _obscure2,
+                  _passwordField(_pw2, 'Повторите пароль', 'Введите пароль ещё раз', _obscure2,
                       () => setState(() => _obscure2 = !_obscure2)),
+                  const SizedBox(height: 10),
+                  const Text(
+                      'Пароль можно не задавать — код приглашения продолжит работать как пароль.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: AppColors.textTertiary, fontSize: 13)),
                 ],
               ),
             ),
@@ -408,10 +517,12 @@ class _SecureAccessScreenState extends State<SecureAccessScreen> {
             ),
           ),
           _bottomBar(FilledButton.icon(
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const ConnectedScreen()),
-            ),
-            icon: const Icon(Icons.shield_rounded, size: 20),
+            onPressed: _busy ? null : _activate,
+            icon: _busy
+                ? const SizedBox(
+                    height: 20, width: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white))
+                : const Icon(Icons.shield_rounded, size: 20),
             label: const Text('Активировать доступ'),
           )),
         ],
@@ -456,7 +567,8 @@ class _SecureAccessScreenState extends State<SecureAccessScreen> {
     );
   }
 
-  Widget _passwordField(String label, String hint, bool obscure, VoidCallback toggle) {
+  Widget _passwordField(
+      TextEditingController controller, String label, String hint, bool obscure, VoidCallback toggle) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
@@ -477,6 +589,7 @@ class _SecureAccessScreenState extends State<SecureAccessScreen> {
                 Text(label,
                     style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
                 TextField(
+                  controller: controller,
                   obscureText: obscure,
                   decoration: InputDecoration.collapsed(hintText: hint),
                 ),
