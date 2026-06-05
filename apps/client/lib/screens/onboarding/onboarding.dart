@@ -666,9 +666,9 @@ class ConnectedScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  const Text('Добро пожаловать в\nKok-Tobe Neighborhood',
+                  Text('Добро пожаловать в\n${neighborhoodName.value ?? 'ваш район'}',
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: const TextStyle(
                           fontFamily: AppTheme.displayFont,
                           fontWeight: FontWeight.w700,
                           color: AppColors.primary,

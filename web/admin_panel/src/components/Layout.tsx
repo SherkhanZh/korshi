@@ -8,10 +8,10 @@ import {
   LogOut,
   Search,
   Bell,
+  Building2,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAuth } from '../auth';
-import { NEIGHBORHOOD } from '../lib/meta';
 
 interface NavItem {
   to: string;
@@ -19,17 +19,22 @@ interface NavItem {
   icon: LucideIcon;
 }
 
-const nav: NavItem[] = [
+const adminNav: NavItem[] = [
   { to: '/', label: 'Обзор', icon: LayoutDashboard },
   { to: '/reports', label: 'Заявки', icon: ClipboardList },
   { to: '/announcements', label: 'Объявления', icon: Megaphone },
   { to: '/polls', label: 'Опросы', icon: BarChart3 },
   { to: '/residents', label: 'Жители', icon: Users },
 ];
+const superNav: NavItem[] = [{ to: '/', label: 'Районы', icon: Building2 }];
 
 export function Layout() {
-  const { user, logout } = useAuth();
+  const { user, role, neighborhood, logout } = useAuth();
   const navigate = useNavigate();
+  const isSuper = role === 'super';
+  const nav = isSuper ? superNav : adminNav;
+  const chipLabel = isSuper ? 'Супер-админ' : neighborhood || 'Район';
+  const roleLabel = isSuper ? 'Супер-администратор' : 'Администратор';
 
   return (
     <div className="flex h-full">
@@ -81,12 +86,14 @@ export function Layout() {
           <div className="flex items-center gap-4">
             <span className="inline-flex items-center gap-2 rounded-full bg-greentint px-3 py-1.5 text-sm font-semibold text-primary">
               <img src="/leaf.svg" className="h-4 w-4" alt="" />
-              {NEIGHBORHOOD}
+              {chipLabel}
             </span>
-            <div className="relative w-72">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink3" />
-              <input className="input pl-9" placeholder="Поиск по заявкам, жителям…" />
-            </div>
+            {!isSuper && (
+              <div className="relative w-72">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink3" />
+                <input className="input pl-9" placeholder="Поиск по заявкам, жителям…" />
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-4">
             <button className="grid h-10 w-10 place-items-center rounded-full hover:bg-muted">
@@ -97,7 +104,7 @@ export function Layout() {
                 {(user ?? 'A')[0].toUpperCase()}
               </div>
               <div className="leading-tight">
-                <p className="text-sm font-semibold">Администратор</p>
+                <p className="text-sm font-semibold">{roleLabel}</p>
                 <p className="text-xs text-ink3">{user}</p>
               </div>
             </div>

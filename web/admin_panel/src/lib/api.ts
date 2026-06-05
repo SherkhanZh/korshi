@@ -110,8 +110,15 @@ function adaptReport(r: SrvReport): Report {
 }
 
 // ── auth ──
-export async function adminLogin(email: string, password: string) {
-  const r = await request<{ token: string; email: string }>('/auth/admin/login', {
+export type AdminRole = 'super' | 'admin';
+export interface LoginResult {
+  token: string;
+  email: string;
+  role: AdminRole;
+  neighborhood: { id: string; name: string } | null;
+}
+export async function adminLogin(email: string, password: string): Promise<LoginResult> {
+  const r = await request<LoginResult>('/auth/admin/login', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
   });
@@ -211,4 +218,36 @@ export async function uploadCover(file: File) {
   const fd = new FormData();
   fd.append('image', file);
   return request('/neighborhood/cover', { method: 'POST', body: fd });
+}
+
+// ── super admin: neighborhoods ──
+export interface NeighborhoodRow {
+  id: string;
+  name: string;
+  adminEmail: string | null;
+  residents: number;
+  reports: number;
+  createdAt: string;
+}
+export async function listNeighborhoods(): Promise<NeighborhoodRow[]> {
+  return request<NeighborhoodRow[]>('/super/neighborhoods');
+}
+export async function createNeighborhood(body: {
+  name: string;
+  adminEmail: string;
+  adminPassword: string;
+}) {
+  return request<{ id: string }>('/super/neighborhoods', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+export async function updateNeighborhood(
+  id: string,
+  body: { name?: string; adminEmail?: string; adminPassword?: string },
+) {
+  return request(`/super/neighborhoods/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+}
+export async function deleteNeighborhood(id: string) {
+  return request(`/super/neighborhoods/${id}`, { method: 'DELETE' });
 }

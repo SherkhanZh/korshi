@@ -4,8 +4,8 @@ import multer from 'multer';
 import bcrypt from 'bcryptjs';
 import path from 'path';
 import fs from 'fs';
-import { db, seed, setting } from './db';
-import { signToken, requireAdmin, requireResident, type AuthedRequest } from './auth';
+import { db, seed, neighborhoodName, createNeighborhood } from './db';
+import { signToken, requireAdmin, requireSuper, requireResident, type AuthedRequest } from './auth';
 
 seed();
 
@@ -56,8 +56,8 @@ function reportDetail(r: any) {
   };
 }
 
-function activePoll() {
-  const p = q(`SELECT * FROM polls WHERE status='active' ORDER BY created_at DESC LIMIT 1`).get() as any;
+function activePoll(nid: string) {
+  const p = q(`SELECT * FROM polls WHERE status='active' AND neighborhood_id=? ORDER BY created_at DESC LIMIT 1`).get(nid) as any;
   if (!p) return null;
   const opts = q('SELECT * FROM poll_options WHERE poll_id=? ORDER BY ord').all(p.id) as any[];
   const total = opts.reduce((s, o) => s + o.votes, 0);
@@ -66,7 +66,7 @@ function activePoll() {
 
 // ───────────────────────── health ─────────────────────────
 app.get('/api/health', (_req, res) =>
-  res.json({ status: 'ok', service: 'korshi-server', version: '0.2.0', time: new Date().toISOString() }));
+  res.json({ status: 'ok', service: 'korshi-server', version: '0.3.0', time: new Date().toISOString() }));
 
 // ───────────────────────── auth ─────────────────────────
 app.post('/api/auth/admin/login', (req, res) => {
@@ -75,7 +75,14 @@ app.post('/api/auth/admin/login', (req, res) => {
   if (!a || !bcrypt.compareSync(String(password || ''), a.password_hash)) {
     return res.status(401).json({ error: 'Неверный email или пароль' });
   }
-  res.json({ token: signToken({ sub: String(a.id), role: 'admin' }), email: a.email });
+  res.json({
+    token: signToken({ sub: String(a.id), role: a.role, nid: a.neighborhood_id || undefined }),
+    email: a.email,
+    role: a.role,
+    neighborhood: a.neighborhood_id
+      ? { id: a.neighborhood_id, name: neighborhoodName(a.neighborhood_id) }
+      : null,
+  });
 });
 
 app.post('/api/auth/resident/login', (req, res) => {
@@ -96,8 +103,9 @@ app.post('/api/auth/resident/login', (req, res) => {
     q("UPDATE residents SET status='active' WHERE id=?").run(r.id);
   }
   res.json({
-    token: signToken({ sub: r.id, role: 'resident' }),
+    token: signToken({ sub: r.id, role: 'resident', nid: r.neighborhood_id }),
     resident: { id: r.id, name: r.name, phone: r.phone, address: r.address },
+    neighborhood: { id: r.neighborhood_id, name: neighborhoodName(r.neighborhood_id) },
     hasPassword: !!r.password_hash,
   });
 });
@@ -112,11 +120,11 @@ app.post('/api/auth/resident/password', requireResident, (req: AuthedRequest, re
 // ───────────────────────── resident data ─────────────────────────
 app.get('/api/me', requireResident, (req: AuthedRequest, res) => {
   const r = q('SELECT id,name,phone,address,street,status FROM residents WHERE id=?').get(req.auth!.sub) as any;
-  res.json({ ...r, neighborhood: setting('neighborhood') });
+  res.json({ ...r, neighborhood: neighborhoodName(req.auth!.nid) });
 });
 
-function feedItems(residentId?: string) {
-  const reports = (q('SELECT * FROM reports ORDER BY created_at DESC LIMIT 4').all() as any[]).map((r) => ({
+function feedItems(nid: string) {
+  const reports = (q('SELECT * FROM reports WHERE neighborhood_id=? ORDER BY created_at DESC LIMIT 4').all(nid) as any[]).map((r) => ({
     title: r.title,
     subtitle: `${r.location} · недавно`,
     body: r.description,
@@ -125,7 +133,7 @@ function feedItems(residentId?: string) {
     seenBy: 0,
     created: Number(r.created_at) || 0,
   }));
-  const anns = (q('SELECT * FROM announcements ORDER BY created_at DESC').all() as any[]).map((a) => ({
+  const anns = (q('SELECT * FROM announcements WHERE neighborhood_id=? ORDER BY created_at DESC').all(nid) as any[]).map((a) => ({
     title: a.title,
     subtitle: a.date,
     body: a.message,
@@ -134,28 +142,28 @@ function feedItems(residentId?: string) {
     seenBy: a.seen_by,
     created: Number(a.created_at) || 0,
   }));
-  void residentId;
   return [...reports, ...anns].sort((x, y) => y.created - x.created);
 }
 
-app.get('/api/home', requireResident, (_req, res) => {
-  const pinned = (q(`SELECT * FROM announcements ORDER BY pinned DESC, created_at DESC LIMIT 1`).get() as any) || {};
-  const feed = feedItems().slice(0, 3).map(({ created, ...x }) => x);
-  const ap = activePoll();
+app.get('/api/home', requireResident, (req: AuthedRequest, res) => {
+  const nid = req.auth!.nid!;
+  const pinned = (q(`SELECT * FROM announcements WHERE neighborhood_id=? ORDER BY pinned DESC, created_at DESC LIMIT 1`).get(nid) as any) || {};
+  const feed = feedItems(nid).slice(0, 3).map(({ created, ...x }) => x);
+  const ap = activePoll(nid);
   let yesPct = 0, noPct = 0;
   if (ap && ap.total > 0) {
     const yes = ap.opts.find((o) => o.positive) || ap.opts[0];
     yesPct = Math.round((yes.votes / ap.total) * 100);
     noPct = 100 - yesPct;
   }
-  const chair = q(`SELECT * FROM contacts WHERE badge='chairman' LIMIT 1`).get() as any;
-  const svcs = q(`SELECT * FROM contacts WHERE kind='service' ORDER BY ord LIMIT 2`).all() as any[];
+  const chair = q(`SELECT * FROM contacts WHERE neighborhood_id=? AND badge='chairman' LIMIT 1`).get(nid) as any;
+  const svcs = q(`SELECT * FROM contacts WHERE neighborhood_id=? AND kind='service' ORDER BY ord LIMIT 2`).all(nid) as any[];
   const contacts = [chair, ...svcs].filter(Boolean).map((c) => ({
     name: c.name, role: c.role, category: c.category, phone: c.phone,
   }));
-  const partner = q(`SELECT * FROM contacts WHERE kind='partner' ORDER BY ord LIMIT 1`).get() as any;
+  const partner = q(`SELECT * FROM contacts WHERE neighborhood_id=? AND kind='partner' ORDER BY ord LIMIT 1`).get(nid) as any;
   res.json({
-    neighborhood: setting('neighborhood'),
+    neighborhood: neighborhoodName(nid),
     announcement: { title: pinned.title || '', date: pinned.date || '', body: pinned.message || '' },
     today: feed,
     poll: { question: ap?.p.question || '', yesPct, noPct },
@@ -166,31 +174,33 @@ app.get('/api/home', requireResident, (_req, res) => {
   });
 });
 
-app.get('/api/updates', requireResident, (_req, res) => {
-  const pinned = (q(`SELECT * FROM announcements ORDER BY pinned DESC, created_at DESC LIMIT 1`).get() as any) || {};
-  const latest = feedItems().map(({ created, ...x }) => x);
+app.get('/api/updates', requireResident, (req: AuthedRequest, res) => {
+  const nid = req.auth!.nid!;
+  const pinned = (q(`SELECT * FROM announcements WHERE neighborhood_id=? ORDER BY pinned DESC, created_at DESC LIMIT 1`).get(nid) as any) || {};
+  const latest = feedItems(nid).map(({ created, ...x }) => x);
   res.json({
     pinned: { title: pinned.title || '', date: pinned.date || '', body: pinned.message || '', seenBy: pinned.seen_by || 0 },
     latest,
   });
 });
 
-app.get('/api/contacts', requireResident, (_req, res) => res.json(contactsPayload()));
-function contactsPayload() {
+app.get('/api/contacts', requireResident, (req: AuthedRequest, res) => res.json(contactsPayload(req.auth!.nid!)));
+function contactsPayload(nid: string) {
   const map = (c: any) => ({
     name: c.name, role: c.role, subtitle: c.subtitle, statusLine: c.status_line,
     category: c.category, badge: c.badge, phone: c.phone, desc: c.role,
   });
   return {
-    important: (q(`SELECT * FROM contacts WHERE kind='important' ORDER BY ord`).all() as any[]).map(map),
-    services: (q(`SELECT * FROM contacts WHERE kind='service' ORDER BY ord`).all() as any[]).map(map),
-    partners: (q(`SELECT * FROM contacts WHERE kind='partner' ORDER BY ord`).all() as any[]).map(map),
+    important: (q(`SELECT * FROM contacts WHERE neighborhood_id=? AND kind='important' ORDER BY ord`).all(nid) as any[]).map(map),
+    services: (q(`SELECT * FROM contacts WHERE neighborhood_id=? AND kind='service' ORDER BY ord`).all(nid) as any[]).map(map),
+    partners: (q(`SELECT * FROM contacts WHERE neighborhood_id=? AND kind='partner' ORDER BY ord`).all(nid) as any[]).map(map),
   };
 }
 
 app.get('/api/polls', requireResident, (req: AuthedRequest, res) => {
-  const ap = activePoll();
-  let active: any = { question: '', description: '', options: [], households: 0, endsInDays: 0, voted: false };
+  const nid = req.auth!.nid!;
+  const ap = activePoll(nid);
+  let active: any = { id: '', question: '', description: '', options: [], households: 0, endsInDays: 0, voted: false };
   if (ap) {
     const voted = !!q('SELECT 1 FROM votes WHERE poll_id=? AND resident_id=?').get(ap.p.id, req.auth!.sub);
     active = {
@@ -207,18 +217,21 @@ app.get('/api/polls', requireResident, (req: AuthedRequest, res) => {
       })),
     };
   }
-  const upcoming = (q(`SELECT * FROM decisions WHERE kind='upcoming' ORDER BY ord`).all() as any[]).map((d) => ({
+  const upcoming = (q(`SELECT * FROM decisions WHERE neighborhood_id=? AND kind='upcoming' ORDER BY ord`).all(nid) as any[]).map((d) => ({
     title: d.title, subtitle: d.subtitle, category: d.category, opensLabel: d.opens_label, date: d.date,
   }));
-  const previous = (q(`SELECT * FROM decisions WHERE kind='previous' ORDER BY ord`).all() as any[]).map((d) => ({
+  const previous = (q(`SELECT * FROM decisions WHERE neighborhood_id=? AND kind='previous' ORDER BY ord`).all(nid) as any[]).map((d) => ({
     title: d.title, subtitle: d.subtitle, status: d.status, date: d.date,
   }));
-  const residents = (q('SELECT COUNT(*) n FROM residents').get() as any).n || 1;
+  const residents = (q('SELECT COUNT(*) n FROM residents WHERE neighborhood_id=?').get(nid) as any).n || 1;
   const voters = ap ? (q('SELECT COUNT(*) n FROM votes WHERE poll_id=?').get(ap.p.id) as any).n : 0;
   res.json({ participationPct: Math.min(100, Math.round((voters / residents) * 100)), active, upcoming, previous });
 });
 
 app.post('/api/polls/:id/vote', requireResident, (req: AuthedRequest, res) => {
+  const nid = req.auth!.nid!;
+  const poll = q('SELECT * FROM polls WHERE id=? AND neighborhood_id=?').get(req.params.id, nid) as any;
+  if (!poll) return res.status(404).json({ error: 'poll not found' });
   const optionId = Number(req.body?.optionId);
   const opt = q('SELECT * FROM poll_options WHERE id=? AND poll_id=?').get(optionId, req.params.id) as any;
   if (!opt) return res.status(400).json({ error: 'invalid option' });
@@ -235,7 +248,8 @@ app.post('/api/polls/:id/vote', requireResident, (req: AuthedRequest, res) => {
 });
 
 app.get('/api/reports', requireResident, (req: AuthedRequest, res) => {
-  const rows = q('SELECT * FROM reports WHERE resident_id=? ORDER BY created_at DESC').all(req.auth!.sub) as any[];
+  const rows = q('SELECT * FROM reports WHERE resident_id=? AND neighborhood_id=? ORDER BY created_at DESC')
+    .all(req.auth!.sub, req.auth!.nid!) as any[];
   res.json(rows.map(reportRow));
 });
 
@@ -255,9 +269,9 @@ app.post('/api/reports', requireResident, (req: AuthedRequest, res) => {
   };
   const desc = String(description || '').trim();
   const id = `c${nowMs()}`;
-  q(`INSERT INTO reports (id,resident_id,author,title,category,status,location,date_time,description,steps_json,detail_steps_json,updates_json,created_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
-    id, req.auth!.sub, resident?.name || '', desc || titles[category] || 'Обращение', category, 'waitingResponse',
+  q(`INSERT INTO reports (id,neighborhood_id,resident_id,author,title,category,status,location,date_time,description,steps_json,detail_steps_json,updates_json,created_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+    id, req.auth!.nid!, req.auth!.sub, resident?.name || '', desc || titles[category] || 'Обращение', category, 'waitingResponse',
     location || '', new Date().toLocaleString('ru-RU'), desc,
     JSON.stringify([
       { label: 'Отправлено', date: 'сейчас', state: 'done' },
@@ -276,13 +290,17 @@ app.post('/api/reports', requireResident, (req: AuthedRequest, res) => {
 });
 
 // ───────────────────────── admin: reports ─────────────────────────
-app.get('/api/admin/reports', requireAdmin, (_req, res) => {
-  const rows = q('SELECT * FROM reports ORDER BY created_at DESC').all() as any[];
+app.get('/api/admin/reports', requireAdmin, (req: AuthedRequest, res) => {
+  const rows = q('SELECT * FROM reports WHERE neighborhood_id=? ORDER BY created_at DESC').all(req.auth!.nid!) as any[];
   res.json(rows.map((r) => ({ ...reportDetail(r), resident: r.author })));
 });
 
-app.patch('/api/admin/reports/:id', requireAdmin, (req, res) => {
-  const r = q('SELECT * FROM reports WHERE id=?').get(req.params.id) as any;
+function adminReport(id: string, nid: string) {
+  return q('SELECT * FROM reports WHERE id=? AND neighborhood_id=?').get(id, nid) as any;
+}
+
+app.patch('/api/admin/reports/:id', requireAdmin, (req: AuthedRequest, res) => {
+  const r = adminReport(req.params.id, req.auth!.nid!);
   if (!r) return res.status(404).json({ error: 'not found' });
   const { status, contractor, internalNote } = req.body ?? {};
   if (status) q('UPDATE reports SET status=? WHERE id=?').run(status, r.id);
@@ -291,8 +309,8 @@ app.patch('/api/admin/reports/:id', requireAdmin, (req, res) => {
   res.json(reportDetail(q('SELECT * FROM reports WHERE id=?').get(r.id)));
 });
 
-app.post('/api/admin/reports/:id/update', requireAdmin, (req, res) => {
-  const r = q('SELECT * FROM reports WHERE id=?').get(req.params.id) as any;
+app.post('/api/admin/reports/:id/update', requireAdmin, (req: AuthedRequest, res) => {
+  const r = adminReport(req.params.id, req.auth!.nid!);
   if (!r) return res.status(404).json({ error: 'not found' });
   const body = String(req.body?.body || '').trim();
   if (!body) return res.status(400).json({ error: 'body required' });
@@ -303,35 +321,35 @@ app.post('/api/admin/reports/:id/update', requireAdmin, (req, res) => {
 });
 
 // ───────────────────────── admin: announcements ─────────────────────────
-app.get('/api/admin/announcements', requireAdmin, (_req, res) => {
-  res.json((q('SELECT * FROM announcements ORDER BY created_at DESC').all() as any[]).map((a) => ({
+app.get('/api/admin/announcements', requireAdmin, (req: AuthedRequest, res) => {
+  res.json((q('SELECT * FROM announcements WHERE neighborhood_id=? ORDER BY created_at DESC').all(req.auth!.nid!) as any[]).map((a) => ({
     id: a.id, type: a.type, title: a.title, message: a.message, audience: a.audience,
     audienceLabel: a.audience_label, pinned: !!a.pinned, date: a.date, seenBy: a.seen_by,
   })));
 });
-app.post('/api/admin/announcements', requireAdmin, (req, res) => {
+app.post('/api/admin/announcements', requireAdmin, (req: AuthedRequest, res) => {
   const { type, title, message, audience, audienceLabel, publishNow } = req.body ?? {};
   if (!title) return res.status(400).json({ error: 'title required' });
   const id = `a${nowMs()}`;
-  q(`INSERT INTO announcements (id,type,title,message,audience,audience_label,pinned,date,seen_by,created_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?)`).run(
-    id, type || 'update', title, message || '', audience || 'all', audienceLabel || 'Весь район',
+  q(`INSERT INTO announcements (id,neighborhood_id,type,title,message,audience,audience_label,pinned,date,seen_by,created_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?)`).run(
+    id, req.auth!.nid!, type || 'update', title, message || '', audience || 'all', audienceLabel || 'Весь район',
     0, publishNow === false ? 'запланировано' : 'только что', 0, String(nowMs()));
   res.status(201).json({ id });
 });
-app.patch('/api/admin/announcements/:id', requireAdmin, (req, res) => {
+app.patch('/api/admin/announcements/:id', requireAdmin, (req: AuthedRequest, res) => {
   if (req.body?.pinned !== undefined)
-    q('UPDATE announcements SET pinned=? WHERE id=?').run(req.body.pinned ? 1 : 0, req.params.id);
+    q('UPDATE announcements SET pinned=? WHERE id=? AND neighborhood_id=?').run(req.body.pinned ? 1 : 0, req.params.id, req.auth!.nid!);
   res.json({ ok: true });
 });
-app.delete('/api/admin/announcements/:id', requireAdmin, (req, res) => {
-  q('DELETE FROM announcements WHERE id=?').run(req.params.id);
+app.delete('/api/admin/announcements/:id', requireAdmin, (req: AuthedRequest, res) => {
+  q('DELETE FROM announcements WHERE id=? AND neighborhood_id=?').run(req.params.id, req.auth!.nid!);
   res.json({ ok: true });
 });
 
 // ───────────────────────── admin: polls ─────────────────────────
-app.get('/api/admin/polls', requireAdmin, (_req, res) => {
-  const polls = q('SELECT * FROM polls ORDER BY created_at DESC').all() as any[];
+app.get('/api/admin/polls', requireAdmin, (req: AuthedRequest, res) => {
+  const polls = q('SELECT * FROM polls WHERE neighborhood_id=? ORDER BY created_at DESC').all(req.auth!.nid!) as any[];
   res.json(polls.map((p) => {
     const opts = q('SELECT * FROM poll_options WHERE poll_id=? ORDER BY ord').all(p.id) as any[];
     return {
@@ -342,19 +360,21 @@ app.get('/api/admin/polls', requireAdmin, (_req, res) => {
     };
   }));
 });
-app.post('/api/admin/polls', requireAdmin, (req, res) => {
+app.post('/api/admin/polls', requireAdmin, (req: AuthedRequest, res) => {
   const { category, question, options, durationDays, audienceLabel } = req.body ?? {};
   if (!question || !Array.isArray(options) || options.length < 2) return res.status(400).json({ error: 'invalid' });
   const id = `p${nowMs()}`;
-  q(`INSERT INTO polls (id,category,question,description,status,duration_days,audience_label,ends_at,created_at)
-     VALUES (?,?,?,?,?,?,?,?,?)`).run(
-    id, category || null, question, '', 'active', durationDays || 7, audienceLabel || 'Весь район',
+  q(`INSERT INTO polls (id,neighborhood_id,category,question,description,status,duration_days,audience_label,ends_at,created_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?)`).run(
+    id, req.auth!.nid!, category || null, question, '', 'active', durationDays || 7, audienceLabel || 'Весь район',
     `через ${durationDays || 7} дн.`, String(nowMs()));
   const ins = q('INSERT INTO poll_options (poll_id,label,votes,positive,ord) VALUES (?,?,?,?,?)');
   (options as string[]).filter((o) => o.trim()).forEach((label, i) => ins.run(id, label, 0, i === 0 ? 1 : 0, i));
   res.status(201).json({ id });
 });
-app.delete('/api/admin/polls/:id', requireAdmin, (req, res) => {
+app.delete('/api/admin/polls/:id', requireAdmin, (req: AuthedRequest, res) => {
+  const p = q('SELECT id FROM polls WHERE id=? AND neighborhood_id=?').get(req.params.id, req.auth!.nid!) as any;
+  if (!p) return res.status(404).json({ error: 'not found' });
   q('DELETE FROM poll_options WHERE poll_id=?').run(req.params.id);
   q('DELETE FROM votes WHERE poll_id=?').run(req.params.id);
   q('DELETE FROM polls WHERE id=?').run(req.params.id);
@@ -362,13 +382,14 @@ app.delete('/api/admin/polls/:id', requireAdmin, (req, res) => {
 });
 
 // ───────────────────────── admin: residents ─────────────────────────
-app.get('/api/admin/residents', requireAdmin, (_req, res) => {
-  const residents = (q('SELECT * FROM residents ORDER BY rowid').all() as any[]).map((r) => ({
+app.get('/api/admin/residents', requireAdmin, (req: AuthedRequest, res) => {
+  const nid = req.auth!.nid!;
+  const residents = (q('SELECT * FROM residents WHERE neighborhood_id=? ORDER BY rowid').all(nid) as any[]).map((r) => ({
     id: r.id, name: r.name, phone: r.phone, address: r.address, street: r.street,
     status: r.status, inviteCode: r.invite_code,
     initials: (r.name && r.name !== '—' ? r.name.split(' ').map((w: string) => w[0]).slice(0, 2).join('') : '—'),
   }));
-  const streets = (q('SELECT * FROM streets ORDER BY ord').all() as any[]).map((s) => ({
+  const streets = (q('SELECT * FROM streets WHERE neighborhood_id=? ORDER BY ord').all(nid) as any[]).map((s) => ({
     id: s.id, name: s.name, connected: s.connected, total: s.total,
   }));
   const total = streets.reduce((s, x) => s + x.total, 0);
@@ -376,78 +397,164 @@ app.get('/api/admin/residents', requireAdmin, (_req, res) => {
   res.json({ residents, streets, community: { connected, total } });
 });
 
-app.post('/api/admin/residents/invite', requireAdmin, (req, res) => {
+app.post('/api/admin/residents/invite', requireAdmin, (req: AuthedRequest, res) => {
   const { phone, address, name } = req.body ?? {};
   if (!phone || !address) return res.status(400).json({ error: 'phone and address required' });
+  const exists = (q('SELECT * FROM residents').all() as any[]).some((r) => last10(r.phone) === last10(phone));
+  if (exists) return res.status(409).json({ error: 'Этот номер уже зарегистрирован' });
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let raw = '';
   for (let i = 0; i < 6; i++) raw += chars[Math.floor(Math.random() * chars.length)];
   const code = `${raw.slice(0, 4)}-${raw.slice(4)}`;
   const id = `res${nowMs()}`;
-  q(`INSERT INTO residents (id,name,phone,address,street,status,invite_code,password_hash,created_at)
-     VALUES (?,?,?,?,?,?,?,?,?)`).run(
-    id, name || '—', phone, address, String(address).split(',')[0] || '', 'invited', code, null, new Date().toISOString());
+  q(`INSERT INTO residents (id,neighborhood_id,name,phone,address,street,status,invite_code,password_hash,created_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?)`).run(
+    id, req.auth!.nid!, name || '—', phone, address, String(address).split(',')[0] || '', 'invited', code, null, new Date().toISOString());
   res.status(201).json({ id, activationCode: code, expires: null });
 });
 
 // ───────────────────────── admin: contacts ─────────────────────────
-app.get('/api/admin/contacts', requireAdmin, (_req, res) => res.json(contactsPayload()));
-app.post('/api/admin/contacts', requireAdmin, (req, res) => {
+app.get('/api/admin/contacts', requireAdmin, (req: AuthedRequest, res) => res.json(contactsPayload(req.auth!.nid!)));
+app.post('/api/admin/contacts', requireAdmin, (req: AuthedRequest, res) => {
   const { kind, name, role, subtitle, statusLine, category, badge, phone } = req.body ?? {};
   if (!kind || !name) return res.status(400).json({ error: 'kind and name required' });
   const id = `ct${nowMs()}`;
-  const ord = (q('SELECT COALESCE(MAX(ord),-1)+1 n FROM contacts WHERE kind=?').get(kind) as any).n;
-  q(`INSERT INTO contacts (id,kind,name,role,subtitle,status_line,category,badge,phone,ord)
-     VALUES (?,?,?,?,?,?,?,?,?,?)`).run(
-    id, kind, name, role || '', subtitle || null, statusLine || null, category || null, badge || null, phone || '', ord);
+  const ord = (q('SELECT COALESCE(MAX(ord),-1)+1 n FROM contacts WHERE neighborhood_id=? AND kind=?').get(req.auth!.nid!, kind) as any).n;
+  q(`INSERT INTO contacts (id,neighborhood_id,kind,name,role,subtitle,status_line,category,badge,phone,ord)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?)`).run(
+    id, req.auth!.nid!, kind, name, role || '', subtitle || null, statusLine || null, category || null, badge || null, phone || '', ord);
   res.status(201).json({ id });
 });
-app.delete('/api/admin/contacts/:id', requireAdmin, (req, res) => {
-  q('DELETE FROM contacts WHERE id=?').run(req.params.id);
+app.delete('/api/admin/contacts/:id', requireAdmin, (req: AuthedRequest, res) => {
+  q('DELETE FROM contacts WHERE id=? AND neighborhood_id=?').run(req.params.id, req.auth!.nid!);
   res.json({ ok: true });
 });
 
 // ───────────────────────── admin: stats ─────────────────────────
-app.get('/api/admin/stats', requireAdmin, (_req, res) => {
-  const byStatus = (s: string) => (q('SELECT COUNT(*) n FROM reports WHERE status=?').get(s) as any).n;
+app.get('/api/admin/stats', requireAdmin, (req: AuthedRequest, res) => {
+  const nid = req.auth!.nid!;
+  const byStatus = (s: string) => (q('SELECT COUNT(*) n FROM reports WHERE neighborhood_id=? AND status=?').get(nid, s) as any).n;
   res.json({
+    neighborhood: neighborhoodName(nid),
     reportsNew: byStatus('new') + byStatus('waitingResponse'),
     reportsInProgress: byStatus('inProgress'),
     reportsResolved: byStatus('resolved'),
-    reportsTotal: (q('SELECT COUNT(*) n FROM reports').get() as any).n,
-    announcements: (q('SELECT COUNT(*) n FROM announcements').get() as any).n,
-    activePolls: (q(`SELECT COUNT(*) n FROM polls WHERE status='active'`).get() as any).n,
-    residents: (q('SELECT COUNT(*) n FROM residents').get() as any).n,
+    reportsTotal: (q('SELECT COUNT(*) n FROM reports WHERE neighborhood_id=?').get(nid) as any).n,
+    announcements: (q('SELECT COUNT(*) n FROM announcements WHERE neighborhood_id=?').get(nid) as any).n,
+    activePolls: (q(`SELECT COUNT(*) n FROM polls WHERE neighborhood_id=? AND status='active'`).get(nid) as any).n,
+    residents: (q('SELECT COUNT(*) n FROM residents WHERE neighborhood_id=?').get(nid) as any).n,
   });
 });
 
-// ───────────────────────── cover image ─────────────────────────
+// ───────────────────────── super admin: neighborhoods ─────────────────────────
+app.get('/api/super/neighborhoods', requireSuper, (_req, res) => {
+  const list = q('SELECT * FROM neighborhoods ORDER BY created_at').all() as any[];
+  res.json(list.map((n) => {
+    const admin = q(`SELECT email FROM admins WHERE role='admin' AND neighborhood_id=? ORDER BY id LIMIT 1`).get(n.id) as any;
+    return {
+      id: n.id,
+      name: n.name,
+      adminEmail: admin?.email || null,
+      residents: (q('SELECT COUNT(*) c FROM residents WHERE neighborhood_id=?').get(n.id) as any).c,
+      reports: (q('SELECT COUNT(*) c FROM reports WHERE neighborhood_id=?').get(n.id) as any).c,
+      createdAt: n.created_at,
+    };
+  }));
+});
+
+app.post('/api/super/neighborhoods', requireSuper, (req, res) => {
+  const name = String(req.body?.name || '').trim();
+  const adminEmail = String(req.body?.adminEmail || '').trim().toLowerCase();
+  const adminPassword = String(req.body?.adminPassword || '');
+  if (!name || !adminEmail || adminPassword.length < 6) {
+    return res.status(400).json({ error: 'Укажите название, email и пароль (от 6 символов)' });
+  }
+  if (q('SELECT 1 FROM admins WHERE email=?').get(adminEmail)) {
+    return res.status(409).json({ error: 'Этот email уже используется' });
+  }
+  const id = createNeighborhood(name, adminEmail, adminPassword);
+  res.status(201).json({ id, name, adminEmail });
+});
+
+app.patch('/api/super/neighborhoods/:id', requireSuper, (req, res) => {
+  const id = req.params.id;
+  const n = q('SELECT * FROM neighborhoods WHERE id=?').get(id) as any;
+  if (!n) return res.status(404).json({ error: 'not found' });
+  const name = req.body?.name !== undefined ? String(req.body.name).trim() : undefined;
+  const adminEmail = req.body?.adminEmail !== undefined ? String(req.body.adminEmail).trim().toLowerCase() : undefined;
+  const adminPassword = req.body?.adminPassword !== undefined ? String(req.body.adminPassword) : undefined;
+
+  if (name !== undefined) {
+    if (!name) return res.status(400).json({ error: 'Название не может быть пустым' });
+    q('UPDATE neighborhoods SET name=? WHERE id=?').run(name, id);
+  }
+
+  const admin = q(`SELECT * FROM admins WHERE role='admin' AND neighborhood_id=? ORDER BY id LIMIT 1`).get(id) as any;
+  if (adminEmail !== undefined) {
+    if (!adminEmail) return res.status(400).json({ error: 'Email не может быть пустым' });
+    const clash = q('SELECT id FROM admins WHERE email=? AND id != ?').get(adminEmail, admin?.id ?? -1) as any;
+    if (clash) return res.status(409).json({ error: 'Этот email уже используется' });
+    if (admin) q('UPDATE admins SET email=? WHERE id=?').run(adminEmail, admin.id);
+  }
+  if (adminPassword !== undefined) {
+    if (adminPassword.length < 6) return res.status(400).json({ error: 'Пароль должен быть от 6 символов' });
+    if (admin) q('UPDATE admins SET password_hash=? WHERE id=?').run(bcrypt.hashSync(adminPassword, 10), admin.id);
+  }
+  res.json({ ok: true });
+});
+
+app.delete('/api/super/neighborhoods/:id', requireSuper, (req, res) => {
+  const id = req.params.id;
+  const n = q('SELECT id FROM neighborhoods WHERE id=?').get(id) as any;
+  if (!n) return res.status(404).json({ error: 'not found' });
+  // Remove the neighborhood's poll votes/options first (no neighborhood_id of their own).
+  const pollIds = (q('SELECT id FROM polls WHERE neighborhood_id=?').all(id) as any[]).map((p) => p.id);
+  for (const pid of pollIds) {
+    q('DELETE FROM poll_options WHERE poll_id=?').run(pid);
+    q('DELETE FROM votes WHERE poll_id=?').run(pid);
+  }
+  for (const t of ['residents', 'reports', 'announcements', 'polls', 'decisions', 'contacts', 'streets']) {
+    q(`DELETE FROM ${t} WHERE neighborhood_id=?`).run(id);
+  }
+  q(`DELETE FROM admins WHERE role='admin' AND neighborhood_id=?`).run(id);
+  q('DELETE FROM neighborhoods WHERE id=?').run(id);
+  // Drop the neighborhood's cover file if present.
+  for (const f of fs.readdirSync(uploadsDir)) {
+    if (f.startsWith(`cover_${id}.`)) fs.unlinkSync(path.join(uploadsDir, f));
+  }
+  res.json({ ok: true });
+});
+
+// ───────────────────────── cover image (per neighborhood) ─────────────────────────
 const uploadsDir = path.join(process.cwd(), 'data', 'uploads');
 fs.mkdirSync(uploadsDir, { recursive: true });
-function findCover(): string | null {
-  const f = fs.readdirSync(uploadsDir).find((n) => n.startsWith('cover.'));
+function coverFile(nid: string): string | null {
+  const f = fs.readdirSync(uploadsDir).find((n) => n.startsWith(`cover_${nid}.`));
   return f ? path.join(uploadsDir, f) : null;
 }
-let coverPath = findCover();
 const upload = multer({
   storage: multer.diskStorage({
     destination: uploadsDir,
-    filename: (_req, file, cb) => cb(null, `cover${path.extname(file.originalname) || '.jpg'}`),
+    filename: (req, file, cb) => {
+      const nid = (req as AuthedRequest).auth!.nid!;
+      cb(null, `cover_${nid}${path.extname(file.originalname) || '.jpg'}`);
+    },
   }),
   limits: { fileSize: 12 * 1024 * 1024 },
 });
-app.post('/api/neighborhood/cover', requireAdmin, upload.single('image'), (req, res) => {
+app.post('/api/neighborhood/cover', requireAdmin, upload.single('image'), (req: AuthedRequest, res) => {
   if (!req.file) return res.status(400).json({ error: 'image required' });
+  const nid = req.auth!.nid!;
   for (const n of fs.readdirSync(uploadsDir)) {
     const p = path.join(uploadsDir, n);
-    if (n.startsWith('cover.') && p !== req.file.path) fs.unlinkSync(p);
+    if (n.startsWith(`cover_${nid}.`) && p !== req.file.path) fs.unlinkSync(p);
   }
-  coverPath = req.file.path;
   res.status(201).json({ ok: true });
 });
-app.get('/api/neighborhood/cover', (_req, res) => {
-  const p = coverPath && fs.existsSync(coverPath) ? coverPath : null;
-  if (!p) return res.status(404).json({ error: 'no cover' });
+app.get('/api/neighborhood/cover', (req, res) => {
+  const nid = String(req.query.nid || '');
+  const p = nid ? coverFile(nid) : null;
+  if (!p || !fs.existsSync(p)) return res.status(404).json({ error: 'no cover' });
   res.sendFile(p);
 });
 

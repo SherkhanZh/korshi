@@ -32,15 +32,30 @@ ksk/
 
 ## Accounts
 
-The backend seeds one admin and a few residents on first boot.
+The backend seeds a super admin, one neighborhood admin, and a few residents on
+first boot.
 
-- **Admin panel:** `admin@korshi.kz` / `admin123`
-- **Resident app:** phone `+7 777 123 45 67`, invite code `AB12-48`
-  (residents log in with phone + invite code; they may set a personal password,
-  and the invite code keeps working as a password until they do).
+- **Super admin (you):** `superadmin@korshi.kz` / `super123` — logs into the same
+  panel and gets a **Районы** screen to create neighborhoods. Creating a
+  neighborhood means: set its name + the neighborhood admin's login and password.
+- **Neighborhood admin:** `admin@korshi.kz` / `admin123` — manages one
+  neighborhood ("мкр Кок-Тобе"): its reports, residents, polls, announcements,
+  contacts and cover.
+- **Resident app:** phone `+7 777 123 45 67`, invite code `AB12-48` (residents log
+  in with phone + invite code; they may set a personal password, and the invite
+  code keeps working as a password until they do).
 
-Auth uses JWTs. Set `JWT_SECRET` in production (see `docker-compose.yml`).
-Data persists in SQLite on the `korshi_data` Docker volume.
+### Multi-neighborhood isolation
+
+Every neighborhood is a separate tenant. A neighborhood admin only ever sees its
+own data, and residents only see their own neighborhood's announcements, polls,
+contacts and cover. The super admin manages neighborhoods but not their day-to-day
+content.
+
+Auth uses JWTs (the token carries the principal's role + neighborhood). Set
+`JWT_SECRET` in production (see `docker-compose.yml`). Data persists in SQLite on
+the `korshi_data` Docker volume; existing single-tenant databases migrate
+automatically into the default neighborhood on first boot.
 
 ## Deployment
 

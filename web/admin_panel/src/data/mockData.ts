@@ -294,9 +294,11 @@ export function generateInviteCode(): string {
 }
 
 export function inviteMessage(address: string, code: string): string {
+  const nbhd =
+    (typeof localStorage !== 'undefined' && localStorage.getItem('korshi_admin_nbhd')) || NEIGHBORHOOD;
   return [
     'Здравствуйте!',
-    `Вас подключили к приложению района ${NEIGHBORHOOD}.`,
+    `Вас подключили к приложению района ${nbhd}.`,
     `Адрес: ${address}`,
     `Код активации: ${code}`,
     'Скачайте приложение и установите пароль при первом входе.',

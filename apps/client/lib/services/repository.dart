@@ -20,7 +20,13 @@ class Repository {
         .cast<String, dynamic>();
     final token = res['token'] as String;
     final resident = (res['resident'] as Map?)?.cast<String, dynamic>();
-    await saveSession(token, resident?['name'] as String?);
+    final nbhd = (res['neighborhood'] as Map?)?.cast<String, dynamic>();
+    await saveSession(
+      token,
+      resident?['name'] as String?,
+      nid: nbhd?['id'] as String?,
+      nbhd: nbhd?['name'] as String?,
+    );
   }
 
   /// Sets a personal password for the logged-in resident.

@@ -15,8 +15,10 @@ class ApiConfig {
   /// instead of being served from Flutter's stale image cache.
   static final int _launch = DateTime.now().millisecondsSinceEpoch;
 
-  /// Neighborhood cover image (uploaded from the admin panel).
-  static String get coverUrl => '$baseUrl/neighborhood/cover?v=$_launch';
+  /// Neighborhood cover image (uploaded from the admin panel), scoped to the
+  /// logged-in resident's neighborhood.
+  static String get coverUrl =>
+      '$baseUrl/neighborhood/cover?nid=${neighborhoodId ?? ''}&v=$_launch';
 }
 
 class ApiException implements Exception {
