@@ -5,19 +5,15 @@ import {
   Wrench,
   Megaphone,
   BarChart3,
-  AlertTriangle,
   CheckCircle2,
   MessageSquare,
   Users,
   Image as ImageIcon,
-  TrendingUp,
-  Eye,
-  Calendar,
 } from 'lucide-react';
 import { useAuth } from '../auth';
 import { categoryMeta } from '../lib/meta';
 import { CoverUploadModal } from '../components/CoverUploadModal';
-import { fetchReports, fetchAnnouncements, fetchPolls } from '../lib/api';
+import { fetchStats, fetchReports } from '../lib/api';
 import { useAsync } from '../lib/useAsync';
 
 export function Dashboard() {
@@ -26,28 +22,19 @@ export function Dashboard() {
   const [coverOpen, setCoverOpen] = useState(false);
   const name = (user?.split('@')[0] ?? 'Админ').replace(/^./, (c) => c.toUpperCase());
 
-  const { data } = useAsync(async () => {
-    const [reports, announcements, polls] = await Promise.all([
-      fetchReports(),
-      fetchAnnouncements(),
-      fetchPolls(),
-    ]);
-    return { reports, announcements, polls };
+  const { data, loading } = useAsync(async () => {
+    const [stats, reports] = await Promise.all([fetchStats(), fetchReports()]);
+    return { stats, reports };
   }, []);
+  const stats = data?.stats;
   const reports = data?.reports ?? [];
-  const announcements = data?.announcements ?? [];
-  const polls = data?.polls ?? [];
-
   const newReports = reports.filter((r) => r.status === 'new');
-  const inProgress = reports.filter((r) => r.status === 'inProgress').length;
-  const activePolls = polls.filter((p) => p.status === 'active').length;
-  const urgent = reports.find((r) => r.urgent);
 
-  const stats = [
-    { label: 'Новые заявки', value: newReports.length, icon: FileText, tint: '#C9881C' },
-    { label: 'В работе', value: inProgress, icon: Wrench, tint: '#1E6B4F' },
-    { label: 'Объявления', value: announcements.length, icon: Megaphone, tint: '#3B9BE0' },
-    { label: 'Активные опросы', value: activePolls, icon: BarChart3, tint: '#6C63C7' },
+  const chips = [
+    { label: 'Новые заявки', value: stats?.reportsNew ?? 0, icon: FileText, tint: '#C9881C' },
+    { label: 'В работе', value: stats?.reportsInProgress ?? 0, icon: Wrench, tint: '#1E6B4F' },
+    { label: 'Объявления', value: stats?.announcements ?? 0, icon: Megaphone, tint: '#3B9BE0' },
+    { label: 'Активные опросы', value: stats?.activePolls ?? 0, icon: BarChart3, tint: '#6C63C7' },
   ];
 
   const quickActions = [
@@ -57,17 +44,19 @@ export function Dashboard() {
     { label: 'Обновить обложку', icon: ImageIcon, onClick: () => setCoverOpen(true) },
   ];
 
-  const insights = [
-    { value: '78%', label: 'Активных жителей', delta: '+6% за неделю', icon: Users },
-    { value: '64', label: 'Видели объявление', delta: '+12% за неделю', icon: Eye },
-    { value: '12', label: 'Решено за неделю', delta: '+20% за неделю', icon: CheckCircle2 },
+  const summary = [
+    { value: stats?.residents ?? 0, label: 'Жителей в районе', icon: Users },
+    { value: stats?.reportsResolved ?? 0, label: 'Заявок решено', icon: CheckCircle2 },
+    { value: stats?.reportsTotal ?? 0, label: 'Всего заявок', icon: FileText },
   ];
+
+  if (loading) return <div className="p-10 text-center text-ink3">Загрузка…</div>;
 
   return (
     <div>
       <div className="mb-6 flex items-end justify-between gap-4">
         <div>
-          <p className="text-ink2">Доброе утро,</p>
+          <p className="text-ink2">Добро пожаловать,</p>
           <h1 className="font-serif text-3xl font-semibold">{name}</h1>
         </div>
         <button className="btn-primary" onClick={() => setCoverOpen(true)}>
@@ -77,7 +66,7 @@ export function Dashboard() {
 
       {/* Stat chips */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {stats.map((s) => (
+        {chips.map((s) => (
           <div key={s.label} className="card flex items-center gap-3 p-4">
             <div
               className="grid h-11 w-11 place-items-center rounded-xl"
@@ -93,40 +82,6 @@ export function Dashboard() {
         ))}
       </div>
 
-      {/* Requires attention */}
-      {urgent && (
-        <>
-          <h2 className="mb-3 mt-8 text-lg font-bold">Требует внимания</h2>
-          <div className="rounded-2xl border border-[#F3DDD3] bg-[#FBEFE9] p-5">
-            <div className="flex items-start gap-4">
-              <div className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-[#FBE6E1] text-[#C0492E]">
-                <AlertTriangle size={24} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <span className="inline-flex items-center gap-1 rounded-full bg-[#C0492E] px-2 py-0.5 text-xs font-bold text-white">
-                  СРОЧНО
-                </span>
-                <h3 className="mt-1.5 text-xl font-bold">{urgent.title}</h3>
-                <p className="text-sm text-ink2">
-                  {urgent.location} · {urgent.resident} · {urgent.ago}
-                </p>
-              </div>
-              <div className="flex shrink-0 gap-2">
-                <button className="btn-ghost" onClick={() => navigate('/reports')}>
-                  Открыть
-                </button>
-                <button
-                  className="btn-primary !bg-[#C0492E] hover:!bg-[#a83e26]"
-                  onClick={() => navigate('/reports')}
-                >
-                  Ответить
-                </button>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-
       {/* New reports */}
       <div className="mb-3 mt-8 flex items-center justify-between">
         <h2 className="text-lg font-bold">Новые заявки</h2>
@@ -135,7 +90,7 @@ export function Dashboard() {
         </button>
       </div>
       <div className="space-y-3">
-        {newReports.slice(0, 2).map((r) => {
+        {newReports.slice(0, 3).map((r) => {
           const cat = categoryMeta[r.category];
           const Icon = cat.icon;
           return (
@@ -152,76 +107,42 @@ export function Dashboard() {
                   {r.location} · {r.resident} · {r.ago}
                 </p>
               </div>
-              <div className="flex shrink-0 gap-2">
-                <button className="btn-ghost !py-2 text-xs" onClick={() => navigate('/reports')}>
-                  <CheckCircle2 size={14} /> В работу
-                </button>
-                <button className="btn-ghost !py-2 text-xs" onClick={() => navigate('/reports')}>
-                  <MessageSquare size={14} /> Ответить
-                </button>
-              </div>
+              <button className="btn-ghost !py-2 text-xs" onClick={() => navigate('/reports')}>
+                <MessageSquare size={14} /> Открыть
+              </button>
             </div>
           );
         })}
+        {newReports.length === 0 && (
+          <div className="card p-8 text-center text-ink3">Новых заявок нет</div>
+        )}
       </div>
 
-      <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Today */}
-        <div className="card p-5">
-          <h3 className="mb-3 font-semibold">Сегодня</h3>
-          <div className="space-y-3 text-sm">
-            {[
-              { icon: Calendar, color: '#1E6B4F', t: 'Ремонт дороги на ул. Абая', s: 'Сегодня, 14:00' },
-              { icon: BarChart3, color: '#6C63C7', t: 'Опрос «Детская площадка»', s: 'Завершается завтра' },
-              { icon: Wrench, color: '#3B9BE0', t: 'Обслуживание воды', s: 'Завтра, 10:00' },
-            ].map((it) => (
-              <div key={it.t} className="flex items-center gap-3">
-                <div
-                  className="grid h-9 w-9 place-items-center rounded-lg"
-                  style={{ backgroundColor: `${it.color}22`, color: it.color }}
-                >
-                  <it.icon size={16} />
-                </div>
-                <div>
-                  <p className="font-medium">{it.t}</p>
-                  <p className="text-xs text-ink3">{it.s}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Quick actions */}
-        <div className="card p-5">
-          <h3 className="mb-3 font-semibold">Быстрые действия</h3>
-          <div className="grid grid-cols-2 gap-3">
-            {quickActions.map((a) => (
-              <button
-                key={a.label}
-                onClick={a.onClick}
-                className="flex items-center gap-3 rounded-xl border border-line bg-surface p-3 text-left text-sm font-medium transition hover:bg-muted"
-              >
-                <a.icon size={18} className="text-primary" />
-                {a.label}
-              </button>
-            ))}
-          </div>
-        </div>
+      {/* Quick actions */}
+      <h2 className="mb-3 mt-8 text-lg font-bold">Быстрые действия</h2>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {quickActions.map((a) => (
+          <button
+            key={a.label}
+            onClick={a.onClick}
+            className="flex items-center gap-3 rounded-xl border border-line bg-surface p-4 text-left text-sm font-medium transition hover:bg-muted"
+          >
+            <a.icon size={18} className="text-primary" />
+            {a.label}
+          </button>
+        ))}
       </div>
 
-      {/* Insights */}
-      <h2 className="mb-3 mt-8 text-lg font-bold">Аналитика района</h2>
+      {/* Summary (real numbers) */}
+      <h2 className="mb-3 mt-8 text-lg font-bold">Сводка района</h2>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {insights.map((i) => (
+        {summary.map((i) => (
           <div key={i.label} className="card p-5">
             <div className="flex items-center gap-2 text-ink3">
               <i.icon size={16} />
               <span className="text-xs">{i.label}</span>
             </div>
             <p className="mt-2 text-3xl font-bold">{i.value}</p>
-            <p className="mt-1 flex items-center gap-1 text-xs font-medium text-primary">
-              <TrendingUp size={13} /> {i.delta}
-            </p>
           </div>
         ))}
       </div>

@@ -26,6 +26,7 @@ class Repository {
       resident?['name'] as String?,
       nid: nbhd?['id'] as String?,
       nbhd: nbhd?['name'] as String?,
+      address: resident?['address'] as String?,
     );
   }
 
@@ -37,6 +38,16 @@ class Repository {
   /// Records the resident's vote for [optionId] in poll [pollId].
   Future<void> vote({required String pollId, required int optionId}) async {
     await _api.postJson('/polls/$pollId/vote', {'optionId': optionId});
+  }
+
+  /// Marks an announcement as seen by the resident (for real view counts).
+  Future<void> markAnnouncementSeen(String id) async {
+    if (id.isEmpty) return;
+    try {
+      await _api.postJson('/announcements/$id/seen', {});
+    } catch (_) {
+      // View tracking is best-effort; ignore failures.
+    }
   }
 
   Future<HomeData> home() async =>

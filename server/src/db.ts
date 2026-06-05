@@ -67,7 +67,9 @@ CREATE TABLE IF NOT EXISTS announcements (
   neighborhood_id TEXT NOT NULL,
   type TEXT NOT NULL,
   title TEXT NOT NULL,
+  title_kk TEXT NOT NULL DEFAULT '',
   message TEXT NOT NULL DEFAULT '',
+  message_kk TEXT NOT NULL DEFAULT '',
   audience TEXT NOT NULL DEFAULT 'all',
   audience_label TEXT NOT NULL DEFAULT 'Весь район',
   pinned INTEGER NOT NULL DEFAULT 0,
@@ -75,12 +77,20 @@ CREATE TABLE IF NOT EXISTS announcements (
   seen_by INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS announcement_views (
+  announcement_id TEXT NOT NULL,
+  resident_id TEXT NOT NULL,
+  PRIMARY KEY (announcement_id, resident_id)
+);
 CREATE TABLE IF NOT EXISTS polls (
   id TEXT PRIMARY KEY,
   neighborhood_id TEXT NOT NULL,
   category TEXT,
   question TEXT NOT NULL,
+  question_kk TEXT NOT NULL DEFAULT '',
   description TEXT NOT NULL DEFAULT '',
+  description_kk TEXT NOT NULL DEFAULT '',
+  confidential INTEGER NOT NULL DEFAULT 1,
   status TEXT NOT NULL DEFAULT 'active',
   duration_days INTEGER NOT NULL DEFAULT 7,
   audience_label TEXT NOT NULL DEFAULT 'Весь район',
@@ -91,6 +101,7 @@ CREATE TABLE IF NOT EXISTS poll_options (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   poll_id TEXT NOT NULL,
   label TEXT NOT NULL,
+  label_kk TEXT NOT NULL DEFAULT '',
   votes INTEGER NOT NULL DEFAULT 0,
   positive INTEGER NOT NULL DEFAULT 0,
   ord INTEGER NOT NULL DEFAULT 0
@@ -161,6 +172,19 @@ function migrate() {
   for (const t of ['residents', 'reports', 'announcements', 'polls', 'decisions', 'contacts', 'streets']) {
     db.exec(`UPDATE ${t} SET neighborhood_id = '${DEFAULT_NID}' WHERE neighborhood_id IS NULL`);
   }
+  // Bilingual content columns + poll visibility (added later).
+  ensureColumn('announcements', 'title_kk', "TEXT NOT NULL DEFAULT ''");
+  ensureColumn('announcements', 'message_kk', "TEXT NOT NULL DEFAULT ''");
+  ensureColumn('polls', 'question_kk', "TEXT NOT NULL DEFAULT ''");
+  ensureColumn('polls', 'description_kk', "TEXT NOT NULL DEFAULT ''");
+  ensureColumn('polls', 'confidential', 'INTEGER NOT NULL DEFAULT 1');
+  ensureColumn('poll_options', 'label_kk', "TEXT NOT NULL DEFAULT ''");
+  // Backfill KK = RU for pre-existing rows so the app always has a fallback.
+  db.exec(`UPDATE announcements SET title_kk = title WHERE title_kk = ''`);
+  db.exec(`UPDATE announcements SET message_kk = message WHERE message_kk = ''`);
+  db.exec(`UPDATE polls SET question_kk = question WHERE question_kk = ''`);
+  db.exec(`UPDATE polls SET description_kk = description WHERE description_kk = ''`);
+  db.exec(`UPDATE poll_options SET label_kk = label WHERE label_kk = ''`);
 }
 migrate();
 
@@ -218,9 +242,9 @@ export function seed() {
        VALUES (?,?,?,?,?,?,?,?,?,?)`,
     );
     const now = new Date().toISOString();
-    insR.run('res1', N, 'Шерхан Жантали', '+77771234567', 'ул. Мереке, 12', 'ул. Мереке', 'active', 'AB12-48', null, now);
-    insR.run('res2', N, 'Айгерим Ибраимова', '+77071112233', 'ул. Кок-Тобе, 35', 'ул. Кок-Тобе', 'active', 'CD34-90', null, now);
-    insR.run('res3', N, '—', '+77059876543', 'ул. Парковая, 5', 'ул. Парковая', 'invited', 'EF56-12', null, now);
+    insR.run('res1', N, 'Шерхан Жантали', '+77771234567', 'ул. Мереке, 12', 'ул. Мереке', 'active', '4812', null, now);
+    insR.run('res2', N, 'Айгерим Ибраимова', '+77071112233', 'ул. Кок-Тобе, 35', 'ул. Кок-Тобе', 'active', '3490', null, now);
+    insR.run('res3', N, '—', '+77059876543', 'ул. Парковая, 5', 'ул. Парковая', 'invited', '5612', null, now);
   }
 
   if (count('SELECT COUNT(*) AS n FROM streets') === 0) {
@@ -281,31 +305,38 @@ export function seed() {
 
   if (count('SELECT COUNT(*) AS n FROM announcements') === 0) {
     const a = db.prepare(
-      `INSERT INTO announcements (id,neighborhood_id,type,title,message,audience,audience_label,pinned,date,seen_by,created_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+      `INSERT INTO announcements (id,neighborhood_id,type,title,title_kk,message,message_kk,audience,audience_label,pinned,date,seen_by,created_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     );
     const now = Date.now();
-    a.run('a1', N, 'water', 'Обслуживание воды в субботу',
+    a.run('a1', N, 'water', 'Обслуживание воды в субботу', 'Сенбіде су жөндеу жұмыстары',
       'Водоснабжение будет приостановлено в субботу, 18 мая, с 10:00 до 14:00.',
-      'all', 'Весь район', 1, '18 мая, 10:00 – 14:00', 64, String(now - 3000));
-    a.run('a2', N, 'maintenance', 'Ремонт дороги завтра',
+      'Сенбіде, 18 мамырда, 10:00-ден 14:00-ге дейін су жабылады.',
+      'all', 'Весь район', 1, '18 мая, 10:00 – 14:00', 0, String(now - 3000));
+    a.run('a2', N, 'maintenance', 'Ремонт дороги завтра', 'Ертең жол жөндеу',
       'Пожалуйста, не оставляйте автомобили на улице во время работ.',
-      'street', 'ул. Абая', 0, '18 мая, 08:00 – 16:00', 37, String(now - 2000));
-    a.run('a3', N, 'event', 'Субботник в это воскресенье',
+      'Жұмыс кезінде көліктеріңізді көшеде қалдырмаңыз.',
+      'street', 'ул. Абая', 0, '18 мая, 08:00 – 16:00', 0, String(now - 2000));
+    a.run('a3', N, 'event', 'Субботник в это воскресенье', 'Осы жексенбіде сенбілік',
       'Давайте сохраним наш район чистым и красивым!',
-      'all', 'Весь район', 0, '18 мая, 10:00', 52, String(now - 1000));
+      'Ауданымызды таза әрі әдемі сақтайық!',
+      'all', 'Весь район', 0, '18 мая, 10:00', 0, String(now - 1000));
   }
 
   if (count('SELECT COUNT(*) AS n FROM polls') === 0) {
     const now = Date.now();
     db.prepare(
-      `INSERT INTO polls (id,neighborhood_id,category,question,description,status,duration_days,audience_label,ends_at,created_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?)`,
-    ).run('p1', N, 'infrastructure', 'Установить дополнительные фонари на улице Мереке?',
-      'Повысить безопасность и видимость по вечерам.', 'active', 7, 'Весь район', 'через 2 дн.', String(now));
-    const o = db.prepare('INSERT INTO poll_options (poll_id,label,votes,positive,ord) VALUES (?,?,?,?,?)');
-    o.run('p1', 'Да, поддерживаю', 61, 1, 0);
-    o.run('p1', 'Не сейчас', 17, 0, 1);
+      `INSERT INTO polls (id,neighborhood_id,category,question,question_kk,description,description_kk,confidential,status,duration_days,audience_label,ends_at,created_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    ).run('p1', N, 'infrastructure',
+      'Установить дополнительные фонари на улице Мереке?',
+      'Мереке көшесіне қосымша шамдар орнату керек пе?',
+      'Повысить безопасность и видимость по вечерам.',
+      'Кешкі уақытта қауіпсіздік пен көрінуді арттыру.',
+      0, 'active', 7, 'Весь район', 'через 2 дн.', String(now));
+    const o = db.prepare('INSERT INTO poll_options (poll_id,label,label_kk,votes,positive,ord) VALUES (?,?,?,?,?,?)');
+    o.run('p1', 'Да, поддерживаю', 'Иә, қолдаймын', 61, 1, 0);
+    o.run('p1', 'Не сейчас', 'Әзірге жоқ', 17, 0, 1);
   }
 
   if (count('SELECT COUNT(*) AS n FROM decisions') === 0) {

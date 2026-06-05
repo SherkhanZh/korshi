@@ -16,3 +16,10 @@ final ValueNotifier<int> dataVersion = ValueNotifier<int>(0);
 
 /// Fallback chairman contact (used by "Contact chairman" actions).
 const String kChairmanPhone = '+77010000001';
+
+/// Picks the Kazakh text when the app is in Kazakh and a translation exists,
+/// otherwise falls back to the Russian text.
+String loc(String ru, String? kk) {
+  if (appLocale.value.languageCode == 'kk' && kk != null && kk.isNotEmpty) return kk;
+  return ru;
+}

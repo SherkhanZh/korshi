@@ -10,6 +10,9 @@ final ValueNotifier<String?> residentName = ValueNotifier<String?>(null);
 final ValueNotifier<String?> neighborhoodName = ValueNotifier<String?>(null);
 String? neighborhoodId;
 
+/// The resident's home address (prefilled into the report location field).
+String? residentAddress;
+
 /// Phone the resident typed on the welcome screen — kept in memory only,
 /// used to complete login on the next onboarding step.
 String? pendingPhone;
@@ -18,6 +21,7 @@ const _kToken = 'korshi_token';
 const _kName = 'korshi_name';
 const _kNid = 'korshi_nid';
 const _kNbhd = 'korshi_nbhd';
+const _kAddr = 'korshi_addr';
 
 bool get isLoggedIn => authToken.value != null;
 
@@ -27,6 +31,7 @@ Future<void> loadSession() async {
   residentName.value = p.getString(_kName);
   neighborhoodId = p.getString(_kNid);
   neighborhoodName.value = p.getString(_kNbhd);
+  residentAddress = p.getString(_kAddr);
 }
 
 Future<void> saveSession(
@@ -34,16 +39,19 @@ Future<void> saveSession(
   String? name, {
   String? nid,
   String? nbhd,
+  String? address,
 }) async {
   final p = await SharedPreferences.getInstance();
   await p.setString(_kToken, token);
   if (name != null && name.isNotEmpty) await p.setString(_kName, name);
   if (nid != null) await p.setString(_kNid, nid);
   if (nbhd != null) await p.setString(_kNbhd, nbhd);
+  if (address != null) await p.setString(_kAddr, address);
   authToken.value = token;
   residentName.value = name;
   neighborhoodId = nid;
   neighborhoodName.value = nbhd;
+  residentAddress = address;
 }
 
 Future<void> clearSession() async {
@@ -52,9 +60,11 @@ Future<void> clearSession() async {
   await p.remove(_kName);
   await p.remove(_kNid);
   await p.remove(_kNbhd);
+  await p.remove(_kAddr);
   authToken.value = null;
   residentName.value = null;
   neighborhoodId = null;
   neighborhoodName.value = null;
+  residentAddress = null;
   pendingPhone = null;
 }

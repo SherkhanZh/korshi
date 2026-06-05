@@ -50,7 +50,9 @@ export interface Announcement {
   id: string;
   type: AnnouncementType;
   title: string;
+  titleKk: string;
   message: string;
+  messageKk: string;
   publishNow: boolean;
   audience: Audience;
   audienceLabel: string;
@@ -64,20 +66,29 @@ export type PollCategory = 'infrastructure' | 'safety' | 'budget' | 'community' 
 export type PollStatus = 'active' | 'upcoming' | 'closed';
 
 export interface PollOption {
+  id?: number;
   label: string;
   votes: number;
+}
+
+export interface PollVoter {
+  name: string;
+  optionId: number;
 }
 
 export interface Poll {
   id: string;
   category?: PollCategory;
   question: string;
+  questionKk: string;
   options: PollOption[];
   status: PollStatus;
   durationDays: number;
   audienceLabel: string;
   households: number;
   endsAt: string;
+  confidential: boolean;
+  voters: PollVoter[];
 }
 
 export type ResidentStatus = 'active' | 'invited' | 'notJoined';

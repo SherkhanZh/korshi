@@ -6,8 +6,6 @@ import {
   CheckCircle2,
   MessageSquare,
   HardHat,
-  Phone,
-  RefreshCw,
 } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Badge } from '../components/ui/Badge';
@@ -18,7 +16,9 @@ import type { Category, Report, ReportStatus, ReportStage } from '../types';
 import { fetchReports, patchReport, addReportUpdate } from '../lib/api';
 import { useAsync } from '../lib/useAsync';
 
-const TABS: { key: ReportStatus; label: string }[] = [
+type TabKey = ReportStatus | 'all';
+const TABS: { key: TabKey; label: string }[] = [
+  { key: 'all', label: 'Все' },
   { key: 'new', label: 'Новые' },
   { key: 'inProgress', label: 'В работе' },
   { key: 'waitingCity', label: 'Ожидает город' },
@@ -36,7 +36,7 @@ const QUICK_UPDATES: { stage: ReportStage; label: string; status: ReportStatus }
 export function Reports() {
   const { data, loading, error, setData } = useAsync(fetchReports, []);
   const [items, setItems] = useState<Report[]>([]);
-  const [tab, setTab] = useState<ReportStatus>('new');
+  const [tab, setTab] = useState<TabKey>('all');
   const [cat, setCat] = useState<Category | null>(null);
   const [selected, setSelected] = useState<Report | null>(null);
   const [busy, setBusy] = useState(false);
@@ -46,13 +46,13 @@ export function Reports() {
   }, [data]);
 
   const counts = useMemo(() => {
-    const c: Record<ReportStatus, number> = { new: 0, inProgress: 0, waitingCity: 0, resolved: 0 };
+    const c: Record<TabKey, number> = { all: items.length, new: 0, inProgress: 0, waitingCity: 0, resolved: 0 };
     items.forEach((r) => (c[r.status] += 1));
     return c;
   }, [items]);
 
   const filtered = items.filter((r) => {
-    if (r.status !== tab) return false;
+    if (tab !== 'all' && r.status !== tab) return false;
     if (cat) return r.category === cat;
     return true;
   });
@@ -186,6 +186,7 @@ export function Reports() {
         busy={busy}
         onClose={() => setSelected(null)}
         onStage={applyStage}
+        onReply={(r, text) => run(addReportUpdate(r.id, text))}
         onAssign={(r, c) =>
           run(patchReport(r.id, { contractor: c }).then(() => addReportUpdate(r.id, `Назначен подрядчик: ${c}`)))
         }
@@ -203,6 +204,7 @@ function ReportDetail({
   busy,
   onClose,
   onStage,
+  onReply,
   onAssign,
   onNote,
   onResolve,
@@ -211,23 +213,18 @@ function ReportDetail({
   busy: boolean;
   onClose: () => void;
   onStage: (r: Report, u: (typeof QUICK_UPDATES)[number]) => void;
+  onReply: (r: Report, text: string) => void;
   onAssign: (r: Report, c: string) => void;
   onNote: (r: Report, note: string) => void;
   onResolve: (r: Report) => void;
 }) {
   const [assigning, setAssigning] = useState(false);
   const [note, setNote] = useState('');
+  const [reply, setReply] = useState('');
   if (!report) return null;
   const m = categoryMeta[report.category];
   const st = reportStatusMeta[report.status];
   const Icon = m.icon;
-
-  const fastActions = [
-    { label: 'Ответить', icon: MessageSquare },
-    { label: 'Сменить статус', icon: RefreshCw },
-    { label: 'Подрядчик', icon: HardHat, onClick: () => setAssigning((v) => !v) },
-    { label: 'Позвонить', icon: Phone },
-  ];
 
   return (
     <Modal open title="Детали заявки" onClose={onClose} width={560}>
@@ -259,21 +256,34 @@ function ReportDetail({
         <p className="mt-3 rounded-xl bg-surface p-3 text-sm text-ink2">{report.description}</p>
       )}
 
-      {/* Fast actions */}
-      <div className="mt-4 grid grid-cols-4 gap-2">
-        {fastActions.map((a) => (
-          <button
-            key={a.label}
-            onClick={a.onClick}
-            className="flex flex-col items-center gap-1.5 rounded-xl bg-greentint py-3 text-xs font-medium text-primary transition hover:bg-[#e0ebe1]"
-          >
-            <a.icon size={18} />
-            {a.label}
-          </button>
-        ))}
+      {/* Reply to resident — posts a visible update */}
+      <div className="mt-4">
+        <p className="label">Сообщение жителю</p>
+        <textarea
+          className="input min-h-[64px] resize-y"
+          value={reply}
+          onChange={(e) => setReply(e.target.value)}
+          placeholder="Напишите ответ — он появится в истории заявки у жителя…"
+        />
+        <button
+          className="btn-primary mt-2"
+          disabled={busy || !reply.trim()}
+          onClick={() => {
+            onReply(report, reply.trim());
+            setReply('');
+          }}
+        >
+          <MessageSquare size={16} /> Отправить
+        </button>
       </div>
 
-      {/* Assign contractor */}
+      {/* Assign contractor toggle */}
+      <button
+        className="btn-ghost mt-4 w-full"
+        onClick={() => setAssigning((v) => !v)}
+      >
+        <HardHat size={16} /> {report.contractor ? 'Сменить подрядчика' : 'Назначить подрядчика'}
+      </button>
       {assigning && (
         <div className="mt-3 rounded-xl border border-line p-3">
           <p className="label">Назначить подрядчика</p>

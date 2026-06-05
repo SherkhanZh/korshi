@@ -10,6 +10,10 @@ export function CoverUploadModal({ onClose }: { onClose: () => void }) {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Current cover is per-neighborhood; bust the cache after a successful upload.
+  const nid = localStorage.getItem('korshi_admin_nid') ?? '';
+  const [coverVersion, setCoverVersion] = useState(0);
+  const existingCoverUrl = `/api/neighborhood/cover?nid=${nid}&v=${coverVersion}`;
 
   const pick = (f: File | null) => {
     if (!f) return;
@@ -26,6 +30,9 @@ export function CoverUploadModal({ onClose }: { onClose: () => void }) {
     try {
       await uploadCover(file);
       setDone(true);
+      setFile(null);
+      setPreview(null);
+      setCoverVersion((v) => v + 1);
     } catch (e) {
       if (e instanceof ApiError && e.status === 413) setError('Файл слишком большой.');
       else setError(e instanceof Error ? e.message : 'Не удалось загрузить.');
@@ -45,7 +52,7 @@ export function CoverUploadModal({ onClose }: { onClose: () => void }) {
           <img src={preview} alt="" className="block h-full w-full object-cover" />
         ) : (
           <img
-            src="/api/neighborhood/cover"
+            src={existingCoverUrl}
             alt=""
             className="block h-full w-full object-cover"
             onError={(e) => {

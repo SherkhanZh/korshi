@@ -151,17 +151,34 @@ export async function addReportUpdate(id: string, text: string) {
   }));
 }
 
+// ── stats ──
+export interface AdminStats {
+  neighborhood: string;
+  reportsNew: number;
+  reportsInProgress: number;
+  reportsResolved: number;
+  reportsTotal: number;
+  announcements: number;
+  activePolls: number;
+  residents: number;
+}
+export async function fetchStats(): Promise<AdminStats> {
+  return request<AdminStats>('/admin/stats');
+}
+
 // ── announcements ──
 export async function fetchAnnouncements(): Promise<Announcement[]> {
   const rows = await request<any[]>('/admin/announcements');
   return rows.map((a) => ({
-    id: a.id, type: a.type, title: a.title, message: a.message,
+    id: a.id, type: a.type, title: a.title, titleKk: a.titleKk ?? '',
+    message: a.message, messageKk: a.messageKk ?? '',
     publishNow: true, audience: a.audience, audienceLabel: a.audienceLabel,
     date: a.date, seenBy: a.seenBy, pinned: a.pinned,
   }));
 }
 export async function createAnnouncement(body: {
-  type: string; title: string; message: string; audience: string; audienceLabel: string; publishNow: boolean;
+  type: string; title: string; titleKk: string; message: string; messageKk: string;
+  audience: string; audienceLabel: string; publishNow: boolean;
 }) {
   return request<{ id: string }>('/admin/announcements', { method: 'POST', body: JSON.stringify(body) });
 }
@@ -176,13 +193,24 @@ export async function deleteAnnouncement(id: string) {
 export async function fetchPolls(): Promise<Poll[]> {
   const rows = await request<any[]>('/admin/polls');
   return rows.map((p) => ({
-    id: p.id, category: p.category || undefined, question: p.question,
+    id: p.id, category: p.category || undefined, question: p.question, questionKk: p.questionKk ?? '',
     options: p.options, status: p.status, durationDays: p.durationDays,
     audienceLabel: p.audienceLabel, households: p.households, endsAt: p.endsAt,
+    confidential: !!p.confidential,
+    voters: (p.voters ?? []) as { name: string; optionId: number }[],
   }));
 }
 export async function createPoll(body: {
-  category?: string; question: string; options: string[]; durationDays: number; audienceLabel: string;
+  category?: string;
+  question: string;
+  questionKk: string;
+  description?: string;
+  descriptionKk?: string;
+  options: string[];
+  optionsKk: string[];
+  durationDays: number;
+  audienceLabel: string;
+  confidential: boolean;
 }) {
   return request<{ id: string }>('/admin/polls', { method: 'POST', body: JSON.stringify(body) });
 }

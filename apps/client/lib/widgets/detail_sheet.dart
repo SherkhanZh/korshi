@@ -22,12 +22,33 @@ void showReportSheet(BuildContext context, ReportItem report) {
           status: report.status,
           title: report.title,
           date: report.dateTime,
-          author: report.author.isEmpty ? 'Шерхан Жантали' : report.author,
+          author: report.author.isEmpty ? '—' : report.author,
           body: d.description.isEmpty ? report.chairmanNote : d.description,
           history: history,
           updates: d.chairmanUpdates,
         );
       },
+    ),
+  );
+}
+
+/// Opens the report detail sheet by id (used when a report appears in a feed),
+/// loading the full author + status history + chairman updates.
+void showReportSheetById(BuildContext context, String id) {
+  _show(
+    context,
+    AsyncView<ReportDetail>(
+      create: () => repository.reportDetail(id),
+      builder: (context, d) => _DetailBody(
+        category: d.report.category,
+        status: d.report.status,
+        title: d.report.title,
+        date: d.report.dateTime,
+        author: d.report.author.isEmpty ? '—' : d.report.author,
+        body: d.description.isEmpty ? d.report.chairmanNote : d.description,
+        history: d.detailSteps.isNotEmpty ? d.detailSteps : d.report.steps,
+        updates: d.chairmanUpdates,
+      ),
     ),
   );
 }

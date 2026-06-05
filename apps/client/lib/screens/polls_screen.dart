@@ -36,16 +36,24 @@ class _PollsScreenState extends State<PollsScreen> {
               builder: (context, d) => ListView(
                 padding: const EdgeInsets.only(bottom: 24),
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: _participationBanner(l, d.participationPct),
-                  ),
-                  const SizedBox(height: 16),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: _activePoll(context, l, d.active),
-                  ),
-                  const SizedBox(height: 24),
+                  if (d.active.exists) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: _participationBanner(l, d.participationPct),
+                    ),
+                    const SizedBox(height: 16),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: _activePoll(context, l, d.active),
+                    ),
+                    const SizedBox(height: 24),
+                  ] else ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: _noActivePoll(),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: SectionHeader(title: l.upcomingDecisions, onSeeAll: () => _soon(context)),
@@ -134,10 +142,10 @@ class _PollsScreenState extends State<PollsScreen> {
                       ],
                     ),
                     const SizedBox(height: 10),
-                    Text(poll.question,
+                    Text(loc(poll.question, poll.questionKk),
                         style: AppTheme.sectionTitle.copyWith(fontSize: 21)),
                     const SizedBox(height: 6),
-                    Text(poll.description, style: AppTheme.subtle),
+                    Text(loc(poll.description, poll.descriptionKk), style: AppTheme.subtle),
                   ],
                 ),
               ),
@@ -193,6 +201,7 @@ class _PollsScreenState extends State<PollsScreen> {
               ),
             ],
           ),
+          _visibility(poll),
           if (poll.voted) ...[
             const SizedBox(height: 12),
             const Divider(color: AppColors.border),
@@ -230,6 +239,90 @@ class _PollsScreenState extends State<PollsScreen> {
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _noActivePoll() {
+    return AppCard(
+      child: Column(
+        children: [
+          const Icon(Icons.how_to_vote_outlined,
+              size: 40, color: AppColors.textTertiary),
+          const SizedBox(height: 10),
+          Text(loc('Сейчас нет активных опросов', 'Қазір белсенді сауалнамалар жоқ'),
+              style: const TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 4),
+          Text(loc('Здесь появятся новые опросы района.', 'Мұнда аудан сауалнамалары пайда болады.'),
+              textAlign: TextAlign.center, style: AppTheme.subtle),
+        ],
+      ),
+    );
+  }
+
+  /// Confidential note, or — for public polls — the list of who voted.
+  Widget _visibility(ActivePoll poll) {
+    if (poll.confidential) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 10),
+        child: Row(
+          children: [
+            const Icon(Icons.lock_outline_rounded,
+                size: 15, color: AppColors.textSecondary),
+            const SizedBox(width: 6),
+            Text(loc('Голосование конфиденциально', 'Дауыс беру құпия'),
+                style: AppTheme.subtle),
+          ],
+        ),
+      );
+    }
+    if (poll.voters.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 10),
+        child: Row(
+          children: [
+            const Icon(Icons.public_rounded, size: 15, color: AppColors.primary),
+            const SizedBox(width: 6),
+            Text(loc('Открытое голосование', 'Ашық дауыс беру'), style: AppTheme.subtle),
+          ],
+        ),
+      );
+    }
+    String optLabel(int id) {
+      for (final o in poll.options) {
+        if (o.id == id) return loc(o.label, o.labelKk);
+      }
+      return '—';
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.public_rounded, size: 15, color: AppColors.primary),
+                const SizedBox(width: 6),
+                Text(loc('Как проголосовали:', 'Қалай дауыс берді:'),
+                    style: AppTheme.subtle.copyWith(fontWeight: FontWeight.w700)),
+              ],
+            ),
+            const SizedBox(height: 6),
+            for (final v in poll.voters)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 2),
+                child: Text('${v.name} — ${optLabel(v.optionId)}',
+                    style: AppTheme.subtle),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -287,7 +380,7 @@ class _PollsScreenState extends State<PollsScreen> {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Text(opt.label,
+                child: Text(loc(opt.label, opt.labelKk),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(

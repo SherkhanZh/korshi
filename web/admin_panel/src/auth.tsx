@@ -29,6 +29,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('korshi_admin_user', r.email);
     localStorage.setItem('korshi_admin_role', r.role);
     localStorage.setItem('korshi_admin_nbhd', r.neighborhood?.name ?? '');
+    localStorage.setItem('korshi_admin_nid', r.neighborhood?.id ?? '');
     setUser(r.email);
     setRole(r.role);
     setNeighborhood(r.neighborhood?.name ?? null);
@@ -39,6 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('korshi_admin_user');
     localStorage.removeItem('korshi_admin_role');
     localStorage.removeItem('korshi_admin_nbhd');
+    localStorage.removeItem('korshi_admin_nid');
     setUser(null);
     setRole(null);
     setNeighborhood(null);

@@ -28,7 +28,9 @@ export function Announcements() {
 
   const [type, setType] = useState<AnnouncementType>('maintenance');
   const [title, setTitle] = useState('');
+  const [titleKk, setTitleKk] = useState('');
   const [message, setMessage] = useState('');
+  const [messageKk, setMessageKk] = useState('');
   const [publishNow, setPublishNow] = useState(true);
   const [audience, setAudience] = useState<Audience>('all');
 
@@ -39,7 +41,9 @@ export function Announcements() {
   const reset = () => {
     setType('maintenance');
     setTitle('');
+    setTitleKk('');
     setMessage('');
+    setMessageKk('');
     setPublishNow(true);
     setAudience('all');
   };
@@ -49,7 +53,10 @@ export function Announcements() {
     const audLabel = AUDIENCES.find((a) => a.key === audience)!.label;
     setBusy(true);
     try {
-      await createAnnouncement({ type, title, message, audience, audienceLabel: audLabel, publishNow });
+      await createAnnouncement({
+        type, title, titleKk: titleKk.trim() || title, message,
+        messageKk: messageKk.trim() || message, audience, audienceLabel: audLabel, publishNow,
+      });
       reset();
       setOpen(false);
       reload();
@@ -168,28 +175,41 @@ export function Announcements() {
             </div>
           </div>
 
-          {/* Title */}
+          {/* Title — RU + KK */}
           <div>
             <p className="label">2. Заголовок</p>
             <input
               className="input"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Например: Отключение воды в субботу"
+              placeholder="Русский — напр.: Отключение воды в субботу"
             />
+            <input
+              className="input mt-2"
+              value={titleKk}
+              onChange={(e) => setTitleKk(e.target.value)}
+              placeholder="Қазақша — напр.: Сенбіде су өшіріледі"
+            />
+            <p className="mt-1 text-xs text-ink3">Қазақша өрісі бос болса, орысша мәтін көрсетіледі.</p>
           </div>
 
-          {/* Message */}
+          {/* Message — RU + KK */}
           <div>
             <p className="label">3. Сообщение</p>
             <textarea
-              className="input min-h-[110px] resize-y"
+              className="input min-h-[90px] resize-y"
               maxLength={500}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder="Текст для жителей…"
+              placeholder="Текст для жителей (рус)…"
             />
-            <p className="mt-1 text-right text-xs text-ink3">{message.length}/500</p>
+            <textarea
+              className="input mt-2 min-h-[90px] resize-y"
+              maxLength={500}
+              value={messageKk}
+              onChange={(e) => setMessageKk(e.target.value)}
+              placeholder="Тұрғындарға арналған мәтін (қаз)…"
+            />
           </div>
 
           {/* Schedule */}

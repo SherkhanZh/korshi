@@ -61,8 +61,10 @@ class HomeScreen extends StatelessWidget {
                     builder: (context, d) => Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _announcement(context, l, d),
-                        const SizedBox(height: 20),
+                        if (d.hasAnnouncement) ...[
+                          _announcement(context, l, d),
+                          const SizedBox(height: 20),
+                        ],
                         SectionHeader(
                             title: l.quickReport,
                             onSeeAll: () => _openReport(context)),
@@ -72,8 +74,10 @@ class HomeScreen extends StatelessWidget {
                         Text(l.todayInNeighborhood, style: AppTheme.sectionTitle),
                         const SizedBox(height: 12),
                         _todayCard(context, d.today),
-                        const SizedBox(height: 20),
-                        _pollCard(context, l, d),
+                        if (d.hasPoll) ...[
+                          const SizedBox(height: 20),
+                          _pollCard(context, l, d),
+                        ],
                         const SizedBox(height: 24),
                         SectionHeader(
                             title: l.trustedContacts,
@@ -283,7 +287,7 @@ class HomeScreen extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 8),
-                Text(d.announcementTitle,
+                Text(loc(d.announcementTitle, d.announcementTitleKk),
                     style: const TextStyle(
                         color: Colors.white,
                         fontSize: 19,
@@ -303,15 +307,15 @@ class HomeScreen extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 6),
-                Text(d.announcementBody,
+                Text(loc(d.announcementBody, d.announcementBodyKk),
                     style: const TextStyle(color: Colors.white, fontSize: 14)),
                 const SizedBox(height: 10),
                 GestureDetector(
                   onTap: () => _openUpdate(
                     context,
-                    title: d.announcementTitle,
+                    title: loc(d.announcementTitle, d.announcementTitleKk),
                     date: d.announcementDate,
-                    body: d.announcementBody,
+                    body: loc(d.announcementBody, d.announcementBodyKk),
                     category: IssueCategory.roads,
                     status: AppStatus.upcoming,
                   ),
@@ -407,15 +411,22 @@ class HomeScreen extends StatelessWidget {
   }
 
   Widget _todayRow(BuildContext context, UpdateItem item) {
+    final title = loc(item.title, item.titleKk);
     return InkWell(
-      onTap: () => _openUpdate(
-        context,
-        title: item.title,
-        date: item.subtitle ?? '',
-        body: item.body ?? item.subtitle ?? '',
-        category: item.category,
-        status: item.status,
-      ),
+      onTap: () {
+        if (item.isReport && item.reportId.isNotEmpty) {
+          showReportSheetById(context, item.reportId);
+          return;
+        }
+        _openUpdate(
+          context,
+          title: title,
+          date: item.subtitle ?? '',
+          body: loc(item.body ?? item.subtitle ?? '', item.bodyKk),
+          category: item.category,
+          status: item.status,
+        );
+      },
       child: Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: Row(
@@ -435,7 +446,7 @@ class HomeScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(item.title,
+                Text(title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: AppTheme.cardTitle.copyWith(fontSize: 15)),
@@ -463,7 +474,7 @@ class HomeScreen extends StatelessWidget {
         children: [
           Text(l.communityPoll, style: AppTheme.cardTitle),
           const SizedBox(height: 6),
-          Text(d.pollQuestion, style: AppTheme.body),
+          Text(loc(d.pollQuestion, d.pollQuestionKk), style: AppTheme.body),
           const SizedBox(height: 14),
           ClipRRect(
             borderRadius: BorderRadius.circular(8),

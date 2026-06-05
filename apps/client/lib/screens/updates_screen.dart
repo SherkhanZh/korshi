@@ -32,7 +32,11 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
           ScreenHeader(title: l.updatesTitle, subtitle: l.updatesSubtitle),
           const SizedBox(height: 4),
           FilterChips(
-            labels: [l.filterAll, l.filterImportant, l.filterUpdates, l.filterEvents],
+            labels: [
+              l.filterAll,
+              loc('Объявления', 'Хабарландырулар'),
+              loc('Заявки', 'Өтініштер'),
+            ],
             selected: _filter,
             onSelected: (i) => setState(() => _filter = i),
           ),
@@ -42,21 +46,36 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
               create: () => repository.updates(),
               refresh: dataVersion,
               builder: (context, d) {
-                final items = _applyFilter(d.latest);
-                return ListView(
+                final items = _filter == 1
+                    ? d.announcements
+                    : _filter == 2
+                        ? d.reports
+                        : d.latest;
+                final showPinned = d.hasPinned && _filter != 2;
+                return RefreshIndicator(
+                  color: AppColors.primary,
+                  onRefresh: () async {
+                    dataVersion.value++;
+                    await Future<void>.delayed(const Duration(milliseconds: 500));
+                  },
+                  child: ListView(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                  physics: const AlwaysScrollableScrollPhysics(),
                   children: [
-                    if (_filter == 0 || _filter == 1) ...[
+                    if (showPinned) ...[
                       _pinnedCard(context, l, d),
                       const SizedBox(height: 20),
                     ],
-                    Text(l.latestUpdates, style: AppTheme.cardTitle),
+                    Text(
+                      _filter == 2 ? loc('Мои заявки', 'Менің өтініштерім') : l.latestUpdates,
+                      style: AppTheme.cardTitle,
+                    ),
                     const SizedBox(height: 12),
                     if (items.isEmpty)
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 32),
                         child: Center(
-                          child: Text('Здесь пока пусто',
+                          child: Text(loc('Здесь пока пусто', 'Әзірге бос'),
                               style: AppTheme.subtle),
                         ),
                       ),
@@ -67,6 +86,7 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                     const SizedBox(height: 4),
                     _partnerCard(context, l),
                   ],
+                  ),
                 );
               },
             ),
@@ -76,28 +96,21 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
     );
   }
 
-  List<UpdateItem> _applyFilter(List<UpdateItem> items) {
-    switch (_filter) {
-      case 1: // Important
-        return items.where((i) => i.status == AppStatus.upcoming).toList();
-      case 2: // Updates
-        return items
-            .where((i) =>
-                i.status == AppStatus.update || i.status == AppStatus.resolved)
-            .toList();
-      case 3: // Events
-        return items.where((i) => i.status == AppStatus.event).toList();
-      default:
-        return items;
-    }
-  }
-
   void _openDetail(BuildContext context, UpdateItem item) {
+    // Resident reports open the full report detail (real author + status history).
+    if (item.isReport && item.reportId.isNotEmpty) {
+      showReportSheetById(context, item.reportId);
+      return;
+    }
+    // Count an announcement view when the resident actually opens it.
+    if (item.id.isNotEmpty) {
+      repository.markAnnouncementSeen(item.id).then((_) => dataVersion.value++);
+    }
     showUpdateSheet(
       context,
-      title: item.title,
+      title: loc(item.title, item.titleKk),
       date: item.subtitle ?? '',
-      body: item.body ?? item.subtitle ?? '',
+      body: loc(item.body ?? item.subtitle ?? '', item.bodyKk),
       category: item.category,
       status: item.status,
     );
@@ -145,7 +158,7 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                         ),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: Text(d.pinnedTitle,
+                          child: Text(loc(d.pinnedTitle, d.pinnedTitleKk),
                               style: AppTheme.sectionTitle.copyWith(fontSize: 20)),
                         ),
                       ],
@@ -165,7 +178,7 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                       ],
                     ),
                     const SizedBox(height: 10),
-                    Text(d.pinnedBody, style: AppTheme.body),
+                    Text(loc(d.pinnedBody, d.pinnedBodyKk), style: AppTheme.body),
                   ],
                 ),
               ),
@@ -186,14 +199,19 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
           Row(
             children: [
               FilledButton(
-                onPressed: () => showUpdateSheet(
-                  context,
-                  title: d.pinnedTitle,
-                  date: d.pinnedDate,
-                  body: d.pinnedBody,
-                  category: IssueCategory.water,
-                  status: AppStatus.upcoming,
-                ),
+                onPressed: () {
+                  if (d.pinnedId.isNotEmpty) {
+                    repository.markAnnouncementSeen(d.pinnedId).then((_) => dataVersion.value++);
+                  }
+                  showUpdateSheet(
+                    context,
+                    title: loc(d.pinnedTitle, d.pinnedTitleKk),
+                    date: d.pinnedDate,
+                    body: loc(d.pinnedBody, d.pinnedBodyKk),
+                    category: IssueCategory.water,
+                    status: AppStatus.upcoming,
+                  );
+                },
                 style: FilledButton.styleFrom(minimumSize: const Size(130, 44)),
                 child: Text(l.viewDetails),
               ),
@@ -240,7 +258,7 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      child: Text(item.title,
+                      child: Text(loc(item.title, item.titleKk),
                           style: AppTheme.cardTitle.copyWith(fontSize: 15)),
                     ),
                     const SizedBox(width: 8),
@@ -253,34 +271,36 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                       maxLines: 1, overflow: TextOverflow.ellipsis, style: AppTheme.subtle),
                 if (item.body != null) ...[
                   const SizedBox(height: 6),
-                  Text(item.body!, style: AppTheme.body),
+                  Text(loc(item.body!, item.bodyKk), style: AppTheme.body),
                 ],
-                const SizedBox(height: 10),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Flexible(
-                      child: Text(
-                        l.t('seenBy').replaceFirst('{n}', '${item.seenBy ?? 0}'),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTheme.subtle,
+                if (!item.isReport) ...[
+                  const SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          l.t('seenBy').replaceFirst('{n}', '${item.seenBy ?? 0}'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTheme.subtle,
+                        ),
                       ),
-                    ),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.thumb_up_alt_outlined,
-                            size: 16, color: AppColors.primary),
-                        const SizedBox(width: 6),
-                        Text(l.helpful,
-                            style: AppTheme.subtle.copyWith(
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.w600)),
-                      ],
-                    ),
-                  ],
-                ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.thumb_up_alt_outlined,
+                              size: 16, color: AppColors.primary),
+                          const SizedBox(width: 6),
+                          Text(l.helpful,
+                              style: AppTheme.subtle.copyWith(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w600)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),

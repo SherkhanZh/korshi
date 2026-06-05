@@ -64,6 +64,20 @@ function activePoll(nid: string) {
   return { p, opts, total };
 }
 
+/** Real unique-resident view count for an announcement. */
+function seenCount(annId: string): number {
+  return (q('SELECT COUNT(*) n FROM announcement_views WHERE announcement_id=?').get(annId) as any).n;
+}
+
+/** Who voted for what — exposed only for public (non-confidential) polls. */
+function pollVoters(pollId: string) {
+  return (q(
+    `SELECT r.name AS name, v.option_id AS optionId
+     FROM votes v JOIN residents r ON r.id = v.resident_id
+     WHERE v.poll_id = ? ORDER BY r.name`,
+  ).all(pollId) as any[]).map((x) => ({ name: x.name && x.name !== '—' ? x.name : 'Житель', optionId: x.optionId }));
+}
+
 // ───────────────────────── health ─────────────────────────
 app.get('/api/health', (_req, res) =>
   res.json({ status: 'ok', service: 'korshi-server', version: '0.3.0', time: new Date().toISOString() }));
@@ -123,32 +137,45 @@ app.get('/api/me', requireResident, (req: AuthedRequest, res) => {
   res.json({ ...r, neighborhood: neighborhoodName(req.auth!.nid) });
 });
 
-function feedItems(nid: string) {
-  const reports = (q('SELECT * FROM reports WHERE neighborhood_id=? ORDER BY created_at DESC LIMIT 4').all(nid) as any[]).map((r) => ({
+function feedItems(nid: string, residentId: string) {
+  // Only the resident's own reports appear in their feed (and stay openable).
+  const reports = (q('SELECT * FROM reports WHERE neighborhood_id=? AND resident_id=? ORDER BY created_at DESC LIMIT 6')
+    .all(nid, residentId) as any[]).map((r) => ({
     title: r.title,
     subtitle: `${r.location} · недавно`,
     body: r.description,
     category: r.category,
     status: r.status,
     seenBy: 0,
+    kind: 'report',
+    reportId: r.id,
     created: Number(r.created_at) || 0,
   }));
   const anns = (q('SELECT * FROM announcements WHERE neighborhood_id=? ORDER BY created_at DESC').all(nid) as any[]).map((a) => ({
+    id: a.id,
     title: a.title,
+    titleKk: a.title_kk || a.title,
     subtitle: a.date,
     body: a.message,
+    bodyKk: a.message_kk || a.message,
     category: annTypeCategory(a.type),
     status: annTypeStatus(a.type),
-    seenBy: a.seen_by,
+    seenBy: seenCount(a.id),
+    kind: 'announcement',
     created: Number(a.created_at) || 0,
   }));
   return [...reports, ...anns].sort((x, y) => y.created - x.created);
 }
 
+/** Pinned banner — only when something is actually pinned. */
+function pinnedAnnouncement(nid: string): any | null {
+  return (q(`SELECT * FROM announcements WHERE neighborhood_id=? AND pinned=1 ORDER BY created_at DESC LIMIT 1`).get(nid) as any) || null;
+}
+
 app.get('/api/home', requireResident, (req: AuthedRequest, res) => {
   const nid = req.auth!.nid!;
-  const pinned = (q(`SELECT * FROM announcements WHERE neighborhood_id=? ORDER BY pinned DESC, created_at DESC LIMIT 1`).get(nid) as any) || {};
-  const feed = feedItems(nid).slice(0, 3).map(({ created, ...x }) => x);
+  const pinned = pinnedAnnouncement(nid);
+  const feed = feedItems(nid, req.auth!.sub).slice(0, 3).map(({ created, ...x }) => x);
   const ap = activePoll(nid);
   let yesPct = 0, noPct = 0;
   if (ap && ap.total > 0) {
@@ -164,9 +191,23 @@ app.get('/api/home', requireResident, (req: AuthedRequest, res) => {
   const partner = q(`SELECT * FROM contacts WHERE neighborhood_id=? AND kind='partner' ORDER BY ord LIMIT 1`).get(nid) as any;
   res.json({
     neighborhood: neighborhoodName(nid),
-    announcement: { title: pinned.title || '', date: pinned.date || '', body: pinned.message || '' },
+    announcement: pinned
+      ? {
+          id: pinned.id,
+          title: pinned.title,
+          titleKk: pinned.title_kk || pinned.title,
+          date: pinned.date,
+          body: pinned.message,
+          bodyKk: pinned.message_kk || pinned.message,
+        }
+      : { id: '', title: '', titleKk: '', date: '', body: '', bodyKk: '' },
     today: feed,
-    poll: { question: ap?.p.question || '', yesPct, noPct },
+    poll: {
+      question: ap?.p.question || '',
+      questionKk: ap?.p.question_kk || ap?.p.question || '',
+      yesPct,
+      noPct,
+    },
     contacts,
     partner: partner
       ? { title: partner.name, subtitle: partner.role, rating: '4.9', reviews: '128', phone: partner.phone }
@@ -176,12 +217,30 @@ app.get('/api/home', requireResident, (req: AuthedRequest, res) => {
 
 app.get('/api/updates', requireResident, (req: AuthedRequest, res) => {
   const nid = req.auth!.nid!;
-  const pinned = (q(`SELECT * FROM announcements WHERE neighborhood_id=? ORDER BY pinned DESC, created_at DESC LIMIT 1`).get(nid) as any) || {};
-  const latest = feedItems(nid).map(({ created, ...x }) => x);
+  const pinned = pinnedAnnouncement(nid);
+  const latest = feedItems(nid, req.auth!.sub).map(({ created, ...x }) => x);
   res.json({
-    pinned: { title: pinned.title || '', date: pinned.date || '', body: pinned.message || '', seenBy: pinned.seen_by || 0 },
+    pinned: pinned
+      ? {
+          id: pinned.id,
+          title: pinned.title,
+          titleKk: pinned.title_kk || pinned.title,
+          date: pinned.date,
+          body: pinned.message,
+          bodyKk: pinned.message_kk || pinned.message,
+          seenBy: seenCount(pinned.id),
+        }
+      : { id: '', title: '', titleKk: '', date: '', body: '', bodyKk: '', seenBy: 0 },
     latest,
   });
+});
+
+// Mark an announcement as seen by the logged-in resident (idempotent).
+app.post('/api/announcements/:id/seen', requireResident, (req: AuthedRequest, res) => {
+  const ann = q('SELECT id FROM announcements WHERE id=? AND neighborhood_id=?').get(req.params.id, req.auth!.nid!) as any;
+  if (!ann) return res.status(404).json({ error: 'not found' });
+  q('INSERT OR IGNORE INTO announcement_views (announcement_id, resident_id) VALUES (?,?)').run(ann.id, req.auth!.sub);
+  res.json({ seenBy: seenCount(ann.id) });
 });
 
 app.get('/api/contacts', requireResident, (req: AuthedRequest, res) => res.json(contactsPayload(req.auth!.nid!)));
@@ -200,19 +259,29 @@ function contactsPayload(nid: string) {
 app.get('/api/polls', requireResident, (req: AuthedRequest, res) => {
   const nid = req.auth!.nid!;
   const ap = activePoll(nid);
-  let active: any = { id: '', question: '', description: '', options: [], households: 0, endsInDays: 0, voted: false };
+  let active: any = {
+    id: '', question: '', questionKk: '', description: '', descriptionKk: '',
+    options: [], households: 0, endsInDays: 0, voted: false, confidential: true, voters: [],
+  };
   if (ap) {
     const voted = !!q('SELECT 1 FROM votes WHERE poll_id=? AND resident_id=?').get(ap.p.id, req.auth!.sub);
+    const isConfidential = !!ap.p.confidential;
     active = {
       id: ap.p.id,
       question: ap.p.question,
+      questionKk: ap.p.question_kk || ap.p.question,
       description: ap.p.description,
+      descriptionKk: ap.p.description_kk || ap.p.description,
       households: ap.total,
       endsInDays: ap.p.duration_days,
       voted,
+      confidential: isConfidential,
+      voters: isConfidential ? [] : pollVoters(ap.p.id),
       options: ap.opts.map((o) => ({
         id: o.id,
-        label: o.label, votes: o.votes, positive: !!o.positive,
+        label: o.label,
+        labelKk: o.label_kk || o.label,
+        votes: o.votes, positive: !!o.positive,
         pct: ap.total ? Math.round((o.votes / ap.total) * 100) : 0,
       })),
     };
@@ -323,17 +392,21 @@ app.post('/api/admin/reports/:id/update', requireAdmin, (req: AuthedRequest, res
 // ───────────────────────── admin: announcements ─────────────────────────
 app.get('/api/admin/announcements', requireAdmin, (req: AuthedRequest, res) => {
   res.json((q('SELECT * FROM announcements WHERE neighborhood_id=? ORDER BY created_at DESC').all(req.auth!.nid!) as any[]).map((a) => ({
-    id: a.id, type: a.type, title: a.title, message: a.message, audience: a.audience,
-    audienceLabel: a.audience_label, pinned: !!a.pinned, date: a.date, seenBy: a.seen_by,
+    id: a.id, type: a.type,
+    title: a.title, titleKk: a.title_kk || '',
+    message: a.message, messageKk: a.message_kk || '',
+    audience: a.audience, audienceLabel: a.audience_label,
+    pinned: !!a.pinned, date: a.date, seenBy: seenCount(a.id),
   })));
 });
 app.post('/api/admin/announcements', requireAdmin, (req: AuthedRequest, res) => {
-  const { type, title, message, audience, audienceLabel, publishNow } = req.body ?? {};
+  const { type, title, titleKk, message, messageKk, audience, audienceLabel, publishNow } = req.body ?? {};
   if (!title) return res.status(400).json({ error: 'title required' });
   const id = `a${nowMs()}`;
-  q(`INSERT INTO announcements (id,neighborhood_id,type,title,message,audience,audience_label,pinned,date,seen_by,created_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?)`).run(
-    id, req.auth!.nid!, type || 'update', title, message || '', audience || 'all', audienceLabel || 'Весь район',
+  q(`INSERT INTO announcements (id,neighborhood_id,type,title,title_kk,message,message_kk,audience,audience_label,pinned,date,seen_by,created_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+    id, req.auth!.nid!, type || 'update', title, titleKk || title, message || '', messageKk || message || '',
+    audience || 'all', audienceLabel || 'Весь район',
     0, publishNow === false ? 'запланировано' : 'только что', 0, String(nowMs()));
   res.status(201).json({ id });
 });
@@ -352,24 +425,32 @@ app.get('/api/admin/polls', requireAdmin, (req: AuthedRequest, res) => {
   const polls = q('SELECT * FROM polls WHERE neighborhood_id=? ORDER BY created_at DESC').all(req.auth!.nid!) as any[];
   res.json(polls.map((p) => {
     const opts = q('SELECT * FROM poll_options WHERE poll_id=? ORDER BY ord').all(p.id) as any[];
+    const confidential = !!p.confidential;
     return {
-      id: p.id, category: p.category, question: p.question, status: p.status,
+      id: p.id, category: p.category, question: p.question, questionKk: p.question_kk || '',
+      status: p.status, confidential,
       durationDays: p.duration_days, audienceLabel: p.audience_label,
       households: opts.reduce((s, o) => s + o.votes, 0), endsAt: p.ends_at,
-      options: opts.map((o) => ({ label: o.label, votes: o.votes })),
+      options: opts.map((o) => ({ id: o.id, label: o.label, votes: o.votes })),
+      voters: confidential ? [] : pollVoters(p.id),
     };
   }));
 });
 app.post('/api/admin/polls', requireAdmin, (req: AuthedRequest, res) => {
-  const { category, question, options, durationDays, audienceLabel } = req.body ?? {};
+  const { category, question, questionKk, description, descriptionKk, options, optionsKk, durationDays, audienceLabel, confidential } = req.body ?? {};
   if (!question || !Array.isArray(options) || options.length < 2) return res.status(400).json({ error: 'invalid' });
   const id = `p${nowMs()}`;
-  q(`INSERT INTO polls (id,neighborhood_id,category,question,description,status,duration_days,audience_label,ends_at,created_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?)`).run(
-    id, req.auth!.nid!, category || null, question, '', 'active', durationDays || 7, audienceLabel || 'Весь район',
+  q(`INSERT INTO polls (id,neighborhood_id,category,question,question_kk,description,description_kk,confidential,status,duration_days,audience_label,ends_at,created_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+    id, req.auth!.nid!, category || null, question, questionKk || question, description || '', descriptionKk || description || '',
+    confidential === false ? 0 : 1, 'active', durationDays || 7, audienceLabel || 'Весь район',
     `через ${durationDays || 7} дн.`, String(nowMs()));
-  const ins = q('INSERT INTO poll_options (poll_id,label,votes,positive,ord) VALUES (?,?,?,?,?)');
-  (options as string[]).filter((o) => o.trim()).forEach((label, i) => ins.run(id, label, 0, i === 0 ? 1 : 0, i));
+  const kkArr = Array.isArray(optionsKk) ? optionsKk : [];
+  const ins = q('INSERT INTO poll_options (poll_id,label,label_kk,votes,positive,ord) VALUES (?,?,?,?,?,?)');
+  (options as string[]).forEach((label, i) => {
+    if (!label.trim()) return;
+    ins.run(id, label, (kkArr[i] || label).toString(), 0, i === 0 ? 1 : 0, i);
+  });
   res.status(201).json({ id });
 });
 app.delete('/api/admin/polls/:id', requireAdmin, (req: AuthedRequest, res) => {
@@ -402,10 +483,8 @@ app.post('/api/admin/residents/invite', requireAdmin, (req: AuthedRequest, res) 
   if (!phone || !address) return res.status(400).json({ error: 'phone and address required' });
   const exists = (q('SELECT * FROM residents').all() as any[]).some((r) => last10(r.phone) === last10(phone));
   if (exists) return res.status(409).json({ error: 'Этот номер уже зарегистрирован' });
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let raw = '';
-  for (let i = 0; i < 6; i++) raw += chars[Math.floor(Math.random() * chars.length)];
-  const code = `${raw.slice(0, 4)}-${raw.slice(4)}`;
+  // 4-digit numeric activation code (easy for elderly residents to type).
+  const code = String(Math.floor(1000 + Math.random() * 9000));
   const id = `res${nowMs()}`;
   q(`INSERT INTO residents (id,neighborhood_id,name,phone,address,street,status,invite_code,password_hash,created_at)
      VALUES (?,?,?,?,?,?,?,?,?,?)`).run(

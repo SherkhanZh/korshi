@@ -64,8 +64,15 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
                         return true;
                     }
                   }).toList();
-                  return ListView(
+                  return RefreshIndicator(
+                    color: AppColors.primary,
+                    onRefresh: () async {
+                      dataVersion.value++;
+                      await Future<void>.delayed(const Duration(milliseconds: 500));
+                    },
+                    child: ListView(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                    physics: const AlwaysScrollableScrollPhysics(),
                     children: [
                       for (final r in items) ...[
                         _reportCard(context, l, r),
@@ -73,6 +80,7 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
                       ],
                       _noReportsBanner(context, l),
                     ],
+                    ),
                   );
                 },
               ),

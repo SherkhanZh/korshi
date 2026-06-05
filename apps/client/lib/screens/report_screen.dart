@@ -1,9 +1,13 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../app_state.dart';
 import '../l10n/app_localizations.dart';
 import '../models/models.dart';
 import '../services/repository.dart';
+import '../services/session.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
@@ -20,13 +24,49 @@ class ReportScreen extends StatefulWidget {
 class _ReportScreenState extends State<ReportScreen> {
   late IssueCategory _selected = widget.initialCategory ?? IssueCategory.roads;
   final _controller = TextEditingController();
-  bool _hasPhoto = false;
+  late final _location = TextEditingController(text: residentAddress ?? '');
+  String? _photoPath;
   bool _sending = false;
 
   @override
   void dispose() {
     _controller.dispose();
+    _location.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickPhoto() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_rounded, color: AppColors.primary),
+              title: const Text('Камера'),
+              onTap: () => Navigator.pop(ctx, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_rounded, color: AppColors.primary),
+              title: const Text('Галерея'),
+              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null) return;
+    try {
+      final x = await ImagePicker().pickImage(source: source, maxWidth: 1600, imageQuality: 80);
+      if (x != null) setState(() => _photoPath = x.path);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Не удалось открыть камеру или галерею')),
+        );
+      }
+    }
   }
 
   Future<void> _send() async {
@@ -34,10 +74,11 @@ class _ReportScreenState extends State<ReportScreen> {
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
     try {
+      final loc = _location.text.trim();
       await repository.submitReport(
         category: _selected.code,
         description: _controller.text.trim(),
-        location: 'ул. Мереке, 12',
+        location: loc.isEmpty ? '—' : loc,
       );
       dataVersion.value++; // refresh open lists (Home / Updates / My reports)
       messenger.showSnackBar(
@@ -243,24 +284,24 @@ class _ReportScreenState extends State<ReportScreen> {
       height: 120,
       child: Row(
         children: [
-          if (_hasPhoto)
+          if (_photoPath != null)
             Expanded(
               child: Stack(
                 children: [
-                  Container(
-                    height: 120,
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceMuted,
-                      borderRadius: BorderRadius.circular(14),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: Image.file(
+                      File(_photoPath!),
+                      height: 120,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
                     ),
-                    child: const Icon(Icons.image_rounded,
-                        color: AppColors.textTertiary, size: 36),
                   ),
                   Positioned(
                     top: 6,
                     right: 6,
                     child: GestureDetector(
-                      onTap: () => setState(() => _hasPhoto = false),
+                      onTap: () => setState(() => _photoPath = null),
                       child: const CircleAvatar(
                         radius: 12,
                         backgroundColor: Colors.white,
@@ -272,10 +313,10 @@ class _ReportScreenState extends State<ReportScreen> {
                 ],
               ),
             ),
-          if (_hasPhoto) const SizedBox(width: 12),
+          if (_photoPath != null) const SizedBox(width: 12),
           Expanded(
             child: GestureDetector(
-              onTap: () => setState(() => _hasPhoto = true),
+              onTap: _pickPhoto,
               child: Container(
                 height: 120,
                 decoration: BoxDecoration(
@@ -299,7 +340,7 @@ class _ReportScreenState extends State<ReportScreen> {
                           color: AppColors.primary),
                     ),
                     const SizedBox(height: 8),
-                    Text(l.addPhoto,
+                    Text(_photoPath != null ? l.cameraOrGallery : l.addPhoto,
                         style: const TextStyle(fontWeight: FontWeight.w600)),
                     Text(l.cameraOrGallery, style: AppTheme.subtle),
                   ],
@@ -328,14 +369,13 @@ class _ReportScreenState extends State<ReportScreen> {
             size: 40,
           ),
           const SizedBox(width: 12),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('ул. Мереке, 12',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                Text('Алматы', style: AppTheme.subtle),
-              ],
+          Expanded(
+            child: TextField(
+              controller: _location,
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+              decoration: const InputDecoration.collapsed(
+                hintText: 'Укажите адрес или место',
+              ),
             ),
           ),
           const Icon(Icons.edit_rounded,
