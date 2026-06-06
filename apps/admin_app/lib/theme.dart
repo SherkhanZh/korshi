@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'api.dart' show loc;
+
 /// Korshi palette (shared visual language with the resident app).
 class C {
   C._();
@@ -108,24 +110,24 @@ class Cat {
       C.other;
 
   static String label(String c) => {
-        'water': 'Вода',
-        'roads': 'Дороги',
-        'lights': 'Освещение',
-        'garbage': 'Мусор',
-        'safety': 'Безопасность',
-        'other': 'Другое',
+        'water': loc('Вода', 'Су'),
+        'roads': loc('Дороги', 'Жолдар'),
+        'lights': loc('Освещение', 'Жарық'),
+        'garbage': loc('Мусор', 'Қоқыс'),
+        'safety': loc('Безопасность', 'Қауіпсіздік'),
+        'other': loc('Другое', 'Басқа'),
       }[c] ??
-      'Другое';
+      loc('Другое', 'Басқа');
 }
 
 /// Report status visuals (admin vocabulary).
 class St {
   static String label(String s) => {
-        'new': 'Новая',
-        'waitingResponse': 'Новая',
-        'inProgress': 'В работе',
-        'waitingCity': 'Ожидает город',
-        'resolved': 'Решено',
+        'new': loc('Новая', 'Жаңа'),
+        'waitingResponse': loc('Новая', 'Жаңа'),
+        'inProgress': loc('В работе', 'Жұмыста'),
+        'waitingCity': loc('Ожидает город', 'Қаланы күтуде'),
+        'resolved': loc('Решено', 'Шешілді'),
       }[s] ??
       s;
 

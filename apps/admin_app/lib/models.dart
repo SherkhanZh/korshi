@@ -55,17 +55,33 @@ class AdminReport {
       'new';
 }
 
+class AdminContact {
+  AdminContact(Map<String, dynamic> j)
+      : id = j['id'] as String? ?? '',
+        kind = j['kind'] as String? ?? 'important',
+        name = j['name'] as String? ?? '',
+        role = j['role'] as String? ?? '',
+        subtitle = j['subtitle'] as String? ?? '',
+        category = j['category'] as String? ?? 'other',
+        badge = j['badge'] as String?,
+        phone = j['phone'] as String? ?? '';
+  final String id, kind, name, role, subtitle, category, phone;
+  final String? badge;
+}
+
 class AdminAnnouncement {
   AdminAnnouncement(Map<String, dynamic> j)
       : id = j['id'] as String? ?? '',
         type = j['type'] as String? ?? 'update',
         title = j['title'] as String? ?? '',
+        titleKk = j['titleKk'] as String? ?? '',
         message = j['message'] as String? ?? '',
+        messageKk = j['messageKk'] as String? ?? '',
         audienceLabel = j['audienceLabel'] as String? ?? '',
         date = j['date'] as String? ?? '',
         seenBy = (j['seenBy'] as num?)?.toInt() ?? 0,
         pinned = j['pinned'] as bool? ?? false;
-  final String id, type, title, message, audienceLabel, date;
+  final String id, type, title, titleKk, message, messageKk, audienceLabel, date;
   final int seenBy;
   final bool pinned;
 }

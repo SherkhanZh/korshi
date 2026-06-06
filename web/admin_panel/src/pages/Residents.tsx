@@ -20,22 +20,26 @@ import { PageHeader } from '../components/ui/PageHeader';
 import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
 import { inviteMessage } from '../data/mockData';
-import type { Resident, ResidentStatus, Street } from '../types';
+import type { Resident, ResidentStatus } from '../types';
 import { fetchResidents, inviteResident } from '../lib/api';
 import { useAsync } from '../lib/useAsync';
+import { useI18n } from '../lib/i18n';
 
-function statusBadge(s: ResidentStatus) {
+type Tr = (ru: string, kk: string) => string;
+
+function statusBadge(s: ResidentStatus, tr: Tr) {
   switch (s) {
     case 'active':
-      return <Badge label="Активен" bg="#E2F0E8" fg="#1E6B4F" />;
+      return <Badge label={tr('Активен', 'Белсенді')} bg="#E2F0E8" fg="#1E6B4F" />;
     case 'invited':
-      return <Badge label="Приглашён" bg="#FBEFD6" fg="#C9881C" />;
+      return <Badge label={tr('Приглашён', 'Шақырылды')} bg="#FBEFD6" fg="#C9881C" />;
     case 'notJoined':
-      return <Badge label="Не подключён" bg="#F1F0EA" fg="#6E6E73" />;
+      return <Badge label={tr('Не подключён', 'Қосылмаған')} bg="#F1F0EA" fg="#6E6E73" />;
   }
 }
 
 export function Residents() {
+  const { t: tr } = useI18n();
   const { data, loading, error, reload } = useAsync(fetchResidents, []);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<ResidentStatus | 'all'>('all');
@@ -43,7 +47,6 @@ export function Residents() {
   const [invite, setInvite] = useState(false);
 
   const items: Resident[] = data?.residents ?? [];
-  const streets: Street[] = data?.streets ?? [];
   const community = data?.community ?? { connected: 0, total: 0 };
   const pct = community.total ? Math.round((community.connected / community.total) * 100) : 0;
 
@@ -59,17 +62,17 @@ export function Residents() {
     [items, query, statusFilter],
   );
 
-  if (loading) return <div className="p-10 text-center text-ink3">Загрузка…</div>;
+  if (loading) return <div className="p-10 text-center text-ink3">{tr('Загрузка…', 'Жүктелуде…')}</div>;
   if (error) return <div className="p-10 text-center text-[#C0492E]">{error}</div>;
 
   return (
     <div>
       <PageHeader
-        title="Жители"
-        subtitle="Управление сообществом района"
+        title={tr('Жители', 'Тұрғындар')}
+        subtitle={tr('Управление сообществом района', 'Аудан қауымдастығын басқару')}
         action={
           <button className="btn-primary" onClick={() => setInvite(true)}>
-            <UserPlus size={16} /> Пригласить жителя
+            <UserPlus size={16} /> {tr('Пригласить жителя', 'Тұрғынды шақыру')}
           </button>
         }
       />
@@ -86,16 +89,16 @@ export function Residents() {
             <div className="grid h-[76px] w-[76px] place-items-center rounded-full bg-surface text-center">
               <div>
                 <p className="text-lg font-bold leading-none">{pct}%</p>
-                <p className="text-[10px] text-ink3">подключено</p>
+                <p className="text-[10px] text-ink3">{tr('подключено', 'қосылған')}</p>
               </div>
             </div>
           </div>
           <div>
-            <p className="text-sm text-ink2">Прогресс сообщества</p>
+            <p className="text-sm text-ink2">{tr('Прогресс сообщества', 'Қауымдастық прогресі')}</p>
             <p className="text-2xl font-bold">
-              {community.connected} <span className="text-ink3">из</span> {community.total}
+              {community.connected} <span className="text-ink3">{tr('из', 'ішінен')}</span> {community.total}
             </p>
-            <p className="text-xs text-ink3">домов подключено</p>
+            <p className="text-xs text-ink3">{tr('домов подключено', 'үй қосылған')}</p>
           </div>
         </div>
 
@@ -105,8 +108,8 @@ export function Residents() {
               <UserPlus size={20} />
             </div>
             <div>
-              <p className="font-semibold">Пригласить</p>
-              <p className="text-xs text-ink3">Добавить жителя</p>
+              <p className="font-semibold">{tr('Пригласить', 'Шақыру')}</p>
+              <p className="text-xs text-ink3">{tr('Добавить жителя', 'Тұрғын қосу')}</p>
             </div>
           </button>
           <div className="card flex items-center gap-3 p-5">
@@ -114,8 +117,8 @@ export function Residents() {
               <QrCode size={20} />
             </div>
             <div>
-              <p className="font-semibold">QR-приглашение</p>
-              <p className="text-xs text-ink3">Сгенерировать QR</p>
+              <p className="font-semibold">{tr('QR-приглашение', 'QR-шақыру')}</p>
+              <p className="text-xs text-ink3">{tr('Сгенерировать QR', 'QR жасау')}</p>
             </div>
           </div>
           <div className="card flex items-center gap-3 p-5">
@@ -124,53 +127,29 @@ export function Residents() {
             </div>
             <div>
               <p className="font-semibold">{pct}%</p>
-              <p className="text-xs text-ink3">Участие</p>
+              <p className="text-xs text-ink3">{tr('Участие', 'Қатысу')}</p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Streets overview */}
-      <h3 className="mb-3 mt-8 flex items-center gap-2 font-semibold">
-        <MapPin size={16} className="text-primary" /> Обзор улиц
-      </h3>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {streets.map((s) => {
-          const p = s.total ? Math.round((s.connected / s.total) * 100) : 0;
-          return (
-            <div key={s.id} className="card p-4">
-              <div className="flex items-center justify-between">
-                <p className="font-semibold">{s.name}</p>
-                <span className="text-sm font-bold text-primary">{p}%</span>
-              </div>
-              <p className="mt-0.5 text-xs text-ink3">
-                {s.connected} из {s.total} домов
-              </p>
-              <div className="mt-2 h-2 overflow-hidden rounded-full bg-line">
-                <div className="h-full rounded-full bg-primary" style={{ width: `${p}%` }} />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
       {/* Residents list */}
       <div className="mb-3 mt-8 flex items-center justify-between">
-        <h3 className="font-semibold">Жители ({items.length})</h3>
+        <h3 className="font-semibold">{tr('Жители', 'Тұрғындар')} ({items.length})</h3>
         <div className="flex gap-2">
           <select
             className="input w-40"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as ResidentStatus | 'all')}
           >
-            <option value="all">Все статусы</option>
-            <option value="active">Активные</option>
-            <option value="invited">Приглашённые</option>
-            <option value="notJoined">Не подключены</option>
+            <option value="all">{tr('Все статусы', 'Барлық статус')}</option>
+            <option value="active">{tr('Активные', 'Белсенді')}</option>
+            <option value="invited">{tr('Приглашённые', 'Шақырылған')}</option>
+            <option value="notJoined">{tr('Не подключены', 'Қосылмаған')}</option>
           </select>
           <input
             className="input w-56"
-            placeholder="Поиск жителей…"
+            placeholder={tr('Поиск жителей…', 'Тұрғындарды іздеу…')}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -197,11 +176,11 @@ export function Residents() {
                 {r.inviteCode}
               </span>
             )}
-            {statusBadge(r.status)}
+            {statusBadge(r.status, tr)}
           </div>
         ))}
         {filtered.length === 0 && (
-          <div className="px-5 py-8 text-center text-ink3">Жителей нет</div>
+          <div className="px-5 py-8 text-center text-ink3">{tr('Жителей нет', 'Тұрғындар жоқ')}</div>
         )}
       </div>
 
@@ -224,7 +203,8 @@ function InviteModal({
   onClose: () => void;
   onCreated: () => void;
 }) {
-  const [phone, setPhone] = useState('');
+  const { t: tr } = useI18n();
+  const [phone, setPhone] = useState('+7 ');
   const [address, setAddress] = useState('');
   const [name, setName] = useState('');
   const [code, setCode] = useState<string | null>(null);
@@ -246,80 +226,81 @@ function InviteModal({
     setErr('');
     try {
       const r = await inviteResident({ phone: phone.trim(), address: address.trim(), name: name.trim() || undefined });
+      // Show the code popup first; refreshing the list now would unmount this
+      // modal via the page's loading guard. Reload happens on close instead.
       setCode(r.activationCode);
-      onCreated();
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Не удалось создать приглашение');
+      setErr(e instanceof Error ? e.message : tr('Не удалось создать приглашение', 'Шақыру жасау мүмкін болмады'));
     } finally {
       setBusy(false);
     }
   };
 
+  // Closing the success popup refreshes the resident list.
+  const finish = () => {
+    onCreated();
+    onClose();
+  };
+
+  // Once a code exists, show ONLY the result (no form to scroll past).
+  if (code) {
+    return (
+      <Modal open title={tr('Житель приглашён', 'Тұрғын шақырылды')} onClose={finish} width={480}>
+        <div className="space-y-4">
+          <div className="rounded-xl border border-line bg-greentint p-4 text-center">
+            <p className="text-xs text-ink2">{tr('Код активации', 'Белсендіру коды')}</p>
+            <p className="font-mono text-4xl font-extrabold tracking-[0.3em] text-primary">{code}</p>
+            <p className="mt-1 text-xs text-ink3">{tr('Код не истекает и работает как пароль до смены', 'Код мерзімі бітпейді және ауыстырылғанға дейін құпиясөз ретінде жұмыс істейді')}</p>
+            <button onClick={() => copy(code)} className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-primary">
+              <Copy size={14} /> {copied ? tr('Скопировано', 'Көшірілді') : tr('Копировать код', 'Кодты көшіру')}
+            </button>
+          </div>
+
+          <div>
+            <label className="label">{tr('Приглашение для жителя', 'Тұрғынға арналған шақыру')}</label>
+            <div className="rounded-xl bg-muted p-3 text-sm text-ink2 whitespace-pre-line">{msg}</div>
+          </div>
+
+          <div className="space-y-2">
+            <a
+              href={`https://wa.me/?text=${encodeURIComponent(msg)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="btn-primary w-full !bg-[#25D366] hover:!bg-[#1eb958]"
+            >
+              <MessageCircle size={16} /> {tr('Отправить через WhatsApp', 'WhatsApp арқылы жіберу')}
+            </a>
+            <button onClick={() => copy(msg)} className="btn-ghost w-full">
+              <Copy size={16} /> {tr('Скопировать приглашение', 'Шақыруды көшіру')}
+            </button>
+            <button onClick={finish} className="btn-primary w-full">{tr('Готово', 'Дайын')}</button>
+          </div>
+        </div>
+      </Modal>
+    );
+  }
+
   return (
-    <Modal open title="Пригласить жителя" onClose={onClose} width={480}>
+    <Modal open title={tr('Пригласить жителя', 'Тұрғынды шақыру')} onClose={onClose} width={480}>
       <div className="space-y-4">
         <div>
-          <label className="label">Номер телефона *</label>
-          <input className="input" value={phone} disabled={!!code} onChange={(e) => setPhone(e.target.value)} placeholder="+7 7__ ___ __ __" />
+          <label className="label">{tr('Номер телефона *', 'Телефон нөмірі *')}</label>
+          <input className="input" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+7 7__ ___ __ __" />
         </div>
         <div>
-          <label className="label">Адрес *</label>
-          <input className="input" value={address} disabled={!!code} onChange={(e) => setAddress(e.target.value)} placeholder="ул. Абая, 27" />
+          <label className="label">{tr('Адрес *', 'Мекенжай *')}</label>
+          <input className="input" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="ул. Абая, 27" />
         </div>
         <div>
-          <label className="label">Имя жителя (необязательно)</label>
-          <input className="input" value={name} disabled={!!code} onChange={(e) => setName(e.target.value)} placeholder="Даулет С." />
+          <label className="label">{tr('Имя жителя (необязательно)', 'Тұрғын аты (міндетті емес)')}</label>
+          <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Даулет С." />
         </div>
 
         {err && <p className="rounded-lg bg-[#FBE6E1] px-3 py-2 text-sm text-[#C0492E]">{err}</p>}
 
-        {!code ? (
-          <button className="btn-primary w-full" onClick={create} disabled={busy || !phone.trim() || !address.trim()}>
-            <KeyRound size={16} /> {busy ? 'Создаём…' : 'Создать код активации'}
-          </button>
-        ) : (
-          <>
-            {/* Code */}
-            <div className="flex items-center justify-between rounded-xl border border-line bg-greentint p-3">
-              <div className="flex items-center gap-3">
-                <div className="grid h-10 w-10 place-items-center rounded-lg bg-primary text-white">
-                  <KeyRound size={18} />
-                </div>
-                <div>
-                  <p className="text-xs text-ink2">Код активации (создан сервером)</p>
-                  <p className="font-mono text-2xl font-bold tracking-widest text-primary">{code}</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-xs text-ink3">Код не истекает</p>
-                <button onClick={() => copy(code)} className="mt-1 inline-flex items-center gap-1 text-sm font-semibold text-primary">
-                  <Copy size={14} /> {copied ? 'Скопировано' : 'Копировать'}
-                </button>
-              </div>
-            </div>
-
-            {/* WhatsApp preview */}
-            <div>
-              <label className="label">Предпросмотр приглашения (WhatsApp)</label>
-              <div className="rounded-xl bg-greentint p-3 text-sm text-ink2 whitespace-pre-line">{msg}</div>
-            </div>
-
-            <div className="space-y-2">
-              <a
-                href={`https://wa.me/?text=${encodeURIComponent(msg)}`}
-                target="_blank"
-                rel="noreferrer"
-                className="btn-primary w-full !bg-[#25D366] hover:!bg-[#1eb958]"
-              >
-                <MessageCircle size={16} /> Отправить через WhatsApp
-              </a>
-              <button onClick={() => copy(msg)} className="btn-ghost w-full">
-                <Copy size={16} /> Скопировать приглашение
-              </button>
-              <button onClick={onClose} className="btn-ghost w-full">Готово</button>
-            </div>
-          </>
-        )}
+        <button className="btn-primary w-full" onClick={create} disabled={busy || !phone.trim() || !address.trim()}>
+          <KeyRound size={16} /> {busy ? tr('Создаём…', 'Құрылуда…') : tr('Создать код активации', 'Белсендіру кодын жасау')}
+        </button>
       </div>
     </Modal>
   );
@@ -327,20 +308,21 @@ function InviteModal({
 
 // ─── Resident detail ───
 function ResidentDetail({ resident, onClose }: { resident: Resident | null; onClose: () => void }) {
+  const { t: tr } = useI18n();
   if (!resident) return null;
   const m = resident.metrics;
 
   const quickActions = [
-    { label: 'Написать', icon: MessageCircle },
-    { label: 'Позвонить', icon: Phone },
-    { label: 'Сменить адрес', icon: Home },
-    { label: 'Редактировать', icon: Pencil },
-    { label: 'Перевыпустить код', icon: RefreshCw },
-    { label: 'Деактивировать', icon: UserX, danger: true },
+    { label: tr('Написать', 'Жазу'), icon: MessageCircle },
+    { label: tr('Позвонить', 'Қоңырау шалу'), icon: Phone },
+    { label: tr('Сменить адрес', 'Мекенжайды ауыстыру'), icon: Home },
+    { label: tr('Редактировать', 'Өңдеу'), icon: Pencil },
+    { label: tr('Перевыпустить код', 'Кодты қайта шығару'), icon: RefreshCw },
+    { label: tr('Деактивировать', 'Өшіру'), icon: UserX, danger: true },
   ];
 
   return (
-    <Modal open title="Профиль жителя" onClose={onClose} width={520}>
+    <Modal open title={tr('Профиль жителя', 'Тұрғын профилі')} onClose={onClose} width={520}>
       {/* Header */}
       <div className="flex items-center gap-4 rounded-2xl bg-muted p-4">
         <div className="grid h-16 w-16 place-items-center rounded-full bg-greentint text-xl font-bold text-primary">
@@ -348,7 +330,7 @@ function ResidentDetail({ resident, onClose }: { resident: Resident | null; onCl
         </div>
         <div>
           <h3 className="text-xl font-bold">{resident.name}</h3>
-          <div className="mt-1">{statusBadge(resident.status)}</div>
+          <div className="mt-1">{statusBadge(resident.status, tr)}</div>
           <p className="mt-1.5 flex items-center gap-1.5 text-sm text-ink2"><MapPin size={13} /> {resident.address}</p>
           <p className="flex items-center gap-1.5 text-sm text-ink2"><Phone size={13} /> {resident.phone}</p>
         </div>
@@ -356,7 +338,7 @@ function ResidentDetail({ resident, onClose }: { resident: Resident | null; onCl
 
       {resident.inviteCode && (
         <div className="mt-3 flex items-center justify-between rounded-xl border border-line bg-greentint p-3 text-sm">
-          <span className="text-ink2">Код активации (работает как пароль, пока не изменён)</span>
+          <span className="text-ink2">{tr('Код активации (работает как пароль, пока не изменён)', 'Белсендіру коды (өзгертілгенге дейін құпиясөз ретінде жұмыс істейді)')}</span>
           <span className="font-mono text-lg font-bold tracking-widest text-primary">{resident.inviteCode}</span>
         </div>
       )}
@@ -366,10 +348,10 @@ function ResidentDetail({ resident, onClose }: { resident: Resident | null; onCl
         <>
           <div className="mt-4 grid grid-cols-4 gap-2">
             {[
-              { icon: FileText, v: m.reports, l: 'Заявок' },
-              { icon: BarChart3, v: m.polls, l: 'Опросов' },
-              { icon: Megaphone, v: `${m.announcementsRead}%`, l: 'Прочитано' },
-              { icon: Clock, v: m.lastActive.split(',')[0], l: 'Активность' },
+              { icon: FileText, v: m.reports, l: tr('Заявок', 'Өтініш') },
+              { icon: BarChart3, v: m.polls, l: tr('Опросов', 'Сауалнама') },
+              { icon: Megaphone, v: `${m.announcementsRead}%`, l: tr('Прочитано', 'Оқылды') },
+              { icon: Clock, v: m.lastActive.split(',')[0], l: tr('Активность', 'Белсенділік') },
             ].map((s) => (
               <div key={s.l} className="rounded-xl bg-muted p-3 text-center">
                 <s.icon size={16} className="mx-auto text-primary" />
@@ -380,13 +362,13 @@ function ResidentDetail({ resident, onClose }: { resident: Resident | null; onCl
           </div>
 
           <div className="mt-3 rounded-xl border border-line p-4">
-            <p className="mb-2 text-sm font-semibold">Участие</p>
+            <p className="mb-2 text-sm font-semibold">{tr('Участие', 'Қатысу')}</p>
             <div className="space-y-2 text-sm">
-              <Bar label={`Опросы — ${m.polls} из ${m.pollsTotal}`} pct={(m.polls / m.pollsTotal) * 100} />
-              <Bar label={`Прочитано объявлений — ${m.announcementsRead}%`} pct={m.announcementsRead} />
+              <Bar label={`${tr('Опросы', 'Сауалнамалар')} — ${m.polls} ${tr('из', '/')} ${m.pollsTotal}`} pct={(m.polls / m.pollsTotal) * 100} />
+              <Bar label={`${tr('Прочитано объявлений', 'Оқылған хабарландырулар')} — ${m.announcementsRead}%`} pct={m.announcementsRead} />
             </div>
             <p className="mt-2 text-xs text-ink3">
-              Первый вход: {m.firstLogin} · Активность: {m.participation}
+              {tr('Первый вход', 'Алғашқы кіру')}: {m.firstLogin} · {tr('Активность', 'Белсенділік')}: {m.participation}
             </p>
           </div>
         </>
@@ -409,7 +391,7 @@ function ResidentDetail({ resident, onClose }: { resident: Resident | null; onCl
 
       {resident.adminNote && (
         <div className="mt-4 rounded-xl bg-[#FBF3E6] p-3 text-sm">
-          <p className="text-xs font-semibold text-[#C9881C]">Заметка администратора (приватно)</p>
+          <p className="text-xs font-semibold text-[#C9881C]">{tr('Заметка администратора (приватно)', 'Әкімші ескертпесі (құпия)')}</p>
           <p className="mt-0.5 text-ink2">{resident.adminNote}</p>
         </div>
       )}

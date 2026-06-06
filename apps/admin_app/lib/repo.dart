@@ -49,6 +49,7 @@ class Repo {
   }
 
   Future<void> createAnnouncement(Map<String, dynamic> body) => api.post('/admin/announcements', body);
+  Future<void> updateAnnouncement(String id, Map<String, dynamic> body) => api.patch('/admin/announcements/$id', body);
   Future<void> pinAnnouncement(String id, bool pinned) => api.patch('/admin/announcements/$id', {'pinned': pinned});
   Future<void> deleteAnnouncement(String id) => api.delete('/admin/announcements/$id');
 
@@ -74,6 +75,15 @@ class Repo {
         .cast<String, dynamic>();
     return r['activationCode'] as String? ?? '';
   }
+
+  // ── contacts (important; chairman-managed) ──
+  Future<List<AdminContact>> contacts() async {
+    final list = await api.get('/admin/contacts') as List;
+    return list.map((e) => AdminContact((e as Map).cast<String, dynamic>())).toList();
+  }
+  Future<void> createContact(Map<String, dynamic> body) => api.post('/admin/contacts', body);
+  Future<void> updateContact(String id, Map<String, dynamic> body) => api.patch('/admin/contacts/$id', body);
+  Future<void> deleteContact(String id) => api.delete('/admin/contacts/$id');
 
   // ── cover ──
   Future<void> uploadCover(String filePath) => api.uploadCover(filePath);

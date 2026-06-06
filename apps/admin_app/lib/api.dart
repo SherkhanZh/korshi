@@ -21,6 +21,29 @@ String? neighborhoodId;
 /// Selected bottom-nav tab — lets a push tap jump to a screen.
 final ValueNotifier<int> selectedTab = ValueNotifier<int>(0);
 
+/// Section to auto-open from the dashboard (e.g. after a push tap).
+/// 0 none · 1 reports · 2 announcements · 3 polls.
+final ValueNotifier<int> pendingOpenSection = ValueNotifier<int>(0);
+
+// ── UI language ('ru' | 'kk') ──
+final ValueNotifier<String> adminLocale = ValueNotifier<String>('ru');
+
+Future<void> loadLocale() async {
+  final p = await SharedPreferences.getInstance();
+  final code = p.getString('locale');
+  if (code != null && code.isNotEmpty) adminLocale.value = code;
+}
+
+Future<void> setLocale(String code) async {
+  adminLocale.value = code;
+  final p = await SharedPreferences.getInstance();
+  await p.setString('locale', code);
+}
+
+/// Picks Kazakh when the app is in Kazakh and a translation exists, else Russian.
+String loc(String ru, [String? kk]) =>
+    (adminLocale.value == 'kk' && kk != null && kk.isNotEmpty) ? kk : ru;
+
 bool get isLoggedIn => adminToken.value != null;
 
 Future<void> loadSession() async {
@@ -54,7 +77,9 @@ Future<void> saveSession({
 
 Future<void> clearSession() async {
   final p = await SharedPreferences.getInstance();
+  final locale = p.getString('locale');
   await p.clear();
+  if (locale != null) await p.setString('locale', locale); // keep language choice
   adminToken.value = null;
   adminEmail.value = null;
   adminRole.value = null;

@@ -10,6 +10,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
+      - TZ=Asia/Almaty
       # Change this in production to secure issued JWTs.
       - JWT_SECRET=${JWT_SECRET:-korshi-prod-change-me}
       # Push notifications (optional). Put the Firebase service-account JSON in a

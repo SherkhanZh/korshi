@@ -5,35 +5,36 @@ import {
   Clock,
   CheckCircle2,
   MessageSquare,
-  HardHat,
+  ThumbsUp,
 } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
-import { contractors } from '../data/mockData';
 import { categoryMeta, reportStatusMeta } from '../lib/meta';
 import type { Category, Report, ReportStatus, ReportStage } from '../types';
 import { fetchReports, patchReport, addReportUpdate, reportPhotoUrl } from '../lib/api';
 import { useAsync } from '../lib/useAsync';
+import { useI18n } from '../lib/i18n';
 
 type TabKey = ReportStatus | 'all';
-const TABS: { key: TabKey; label: string }[] = [
-  { key: 'all', label: 'Все' },
-  { key: 'new', label: 'Новые' },
-  { key: 'inProgress', label: 'В работе' },
-  { key: 'waitingCity', label: 'Ожидает город' },
-  { key: 'resolved', label: 'Решено' },
+const TABS: { key: TabKey; label: string; labelKk: string }[] = [
+  { key: 'all', label: 'Все', labelKk: 'Барлығы' },
+  { key: 'new', label: 'Новые', labelKk: 'Жаңа' },
+  { key: 'inProgress', label: 'В работе', labelKk: 'Жұмыста' },
+  { key: 'waitingCity', label: 'Ожидает город', labelKk: 'Қаланы күтуде' },
+  { key: 'resolved', label: 'Решено', labelKk: 'Шешілді' },
 ];
 
-const QUICK_UPDATES: { stage: ReportStage; label: string; status: ReportStatus }[] = [
-  { stage: 'inspected', label: 'Осмотрено', status: 'inProgress' },
-  { stage: 'scheduledRepair', label: 'Ремонт запланирован', status: 'inProgress' },
-  { stage: 'waitingCity', label: 'Ожидает город', status: 'waitingCity' },
-  { stage: 'contractorAssigned', label: 'Назначен подрядчик', status: 'inProgress' },
-  { stage: 'resolved', label: 'Решено', status: 'resolved' },
+const QUICK_UPDATES: { stage: ReportStage; label: string; labelKk: string; status: ReportStatus }[] = [
+  { stage: 'inspected', label: 'Осмотрено', labelKk: 'Қаралды', status: 'inProgress' },
+  { stage: 'scheduledRepair', label: 'Ремонт запланирован', labelKk: 'Жөндеу жоспарланды', status: 'inProgress' },
+  { stage: 'waitingCity', label: 'Ожидает город', labelKk: 'Қаланы күтуде', status: 'waitingCity' },
+  { stage: 'contractorAssigned', label: 'Назначен подрядчик', labelKk: 'Мердігер тағайындалды', status: 'inProgress' },
+  { stage: 'resolved', label: 'Решено', labelKk: 'Шешілді', status: 'resolved' },
 ];
 
 export function Reports() {
+  const { t: tr } = useI18n();
   const { data, loading, error, setData } = useAsync(fetchReports, []);
   const [items, setItems] = useState<Report[]>([]);
   const [tab, setTab] = useState<TabKey>('all');
@@ -72,7 +73,7 @@ export function Reports() {
     try {
       apply(await p);
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'Не удалось обновить заявку');
+      alert(e instanceof Error ? e.message : tr('Не удалось обновить заявку', 'Өтінішті жаңарту мүмкін болмады'));
     } finally {
       setBusy(false);
     }
@@ -81,12 +82,12 @@ export function Reports() {
   const applyStage = (r: Report, u: (typeof QUICK_UPDATES)[number]) =>
     run(patchReport(r.id, { status: u.status }).then(() => addReportUpdate(r.id, u.label)));
 
-  if (loading) return <div className="p-10 text-center text-ink3">Загрузка…</div>;
+  if (loading) return <div className="p-10 text-center text-ink3">{tr('Загрузка…', 'Жүктелуде…')}</div>;
   if (error) return <div className="p-10 text-center text-[#C0492E]">{error}</div>;
 
   return (
     <div>
-      <PageHeader title="Заявки" subtitle="Обращения жителей района" />
+      <PageHeader title={tr('Заявки', 'Өтініштер')} subtitle={tr('Обращения жителей района', 'Аудан тұрғындарының өтініштері')} />
 
       {/* Tabs */}
       <div className="mb-4 flex flex-wrap gap-2">
@@ -98,7 +99,7 @@ export function Reports() {
               tab === t.key ? 'bg-primary text-white' : 'bg-muted text-ink2 hover:bg-line'
             }`}
           >
-            {t.label}
+            {tr(t.label, t.labelKk)}
             <span
               className={`rounded-full px-1.5 text-xs ${
                 tab === t.key ? 'bg-white/25' : 'bg-surface'
@@ -126,7 +127,7 @@ export function Reports() {
                 backgroundColor: active ? `${m.color}14` : '#fff',
               }}
             >
-              <m.icon size={14} /> {m.label}
+              <m.icon size={14} /> {tr(m.label, m.labelKk)}
             </button>
           );
         })}
@@ -153,9 +154,9 @@ export function Reports() {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-medium" style={{ color: m.color }}>
-                    {m.label}
+                    {tr(m.label, m.labelKk)}
                   </span>
-                  <Badge label={st.label} bg={st.bg} fg={st.fg} />
+                  <Badge label={tr(st.label, st.labelKk)} bg={st.bg} fg={st.fg} />
                 </div>
                 <p className="mt-0.5 font-semibold">{r.title}</p>
                 <p className="text-xs text-ink3">
@@ -171,29 +172,28 @@ export function Reports() {
                   else setSelected(r);
                 }}
               >
-                {r.status === 'new' ? 'В работу' : 'Обновить'}
+                {r.status === 'new' ? tr('В работу', 'Жұмысқа') : tr('Обновить', 'Жаңарту')}
               </button>
             </div>
           );
         })}
         {filtered.length === 0 && (
-          <div className="card p-10 text-center text-ink3">Заявок нет</div>
+          <div className="card p-10 text-center text-ink3">{tr('Заявок нет', 'Өтініштер жоқ')}</div>
         )}
       </div>
 
       <ReportDetail
+        key={selected?.id ?? 'none'}
         report={selected}
         busy={busy}
         onClose={() => setSelected(null)}
-        onStage={applyStage}
+        onCommit={applyStage}
         onReply={(r, text) => run(addReportUpdate(r.id, text))}
-        onAssign={(r, c) =>
-          run(patchReport(r.id, { contractor: c }).then(() => addReportUpdate(r.id, `Назначен подрядчик: ${c}`)))
-        }
         onNote={(r, note) => run(patchReport(r.id, { internalNote: note }))}
         onResolve={(r) =>
           run(patchReport(r.id, { status: 'resolved' }).then(() => addReportUpdate(r.id, 'Заявка решена')))
         }
+        tr={tr}
       />
     </div>
   );
@@ -203,31 +203,33 @@ function ReportDetail({
   report,
   busy,
   onClose,
-  onStage,
+  onCommit,
   onReply,
-  onAssign,
   onNote,
   onResolve,
+  tr,
 }: {
   report: Report | null;
   busy: boolean;
   onClose: () => void;
-  onStage: (r: Report, u: (typeof QUICK_UPDATES)[number]) => void;
+  onCommit: (r: Report, u: (typeof QUICK_UPDATES)[number]) => void;
   onReply: (r: Report, text: string) => void;
-  onAssign: (r: Report, c: string) => void;
   onNote: (r: Report, note: string) => void;
   onResolve: (r: Report) => void;
+  tr: (ru: string, kk: string) => string;
 }) {
-  const [assigning, setAssigning] = useState(false);
   const [note, setNote] = useState('');
   const [reply, setReply] = useState('');
+  // A quick-status the chairman selected but hasn't confirmed yet. Nothing is
+  // persisted until they press "Подтвердить".
+  const [staged, setStaged] = useState<(typeof QUICK_UPDATES)[number] | null>(null);
   if (!report) return null;
   const m = categoryMeta[report.category];
   const st = reportStatusMeta[report.status];
   const Icon = m.icon;
 
   return (
-    <Modal open title="Детали заявки" onClose={onClose} width={560}>
+    <Modal open title={tr('Детали заявки', 'Өтініш мәліметтері')} onClose={onClose} width={560}>
       {/* Hero */}
       <div className="flex items-start gap-3 rounded-2xl bg-muted p-4">
         <div
@@ -239,9 +241,9 @@ function ReportDetail({
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold" style={{ color: m.color }}>
-              {m.label}
+              {tr(m.label, m.labelKk)}
             </span>
-            <Badge label={st.label} bg={st.bg} fg={st.fg} />
+            <Badge label={tr(st.label, st.labelKk)} bg={st.bg} fg={st.fg} />
           </div>
           <h3 className="mt-0.5 text-lg font-bold">{report.title}</h3>
           <div className="mt-1 space-y-0.5 text-sm text-ink2">
@@ -259,7 +261,7 @@ function ReportDetail({
       {report.hasPhoto && (
         <img
           src={reportPhotoUrl(report.id)}
-          alt="Фото заявки"
+          alt={tr('Фото заявки', 'Өтініш фотосы')}
           className="mt-3 max-h-72 w-full rounded-xl object-cover"
           onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
         />
@@ -267,12 +269,12 @@ function ReportDetail({
 
       {/* Reply to resident — posts a visible update */}
       <div className="mt-4">
-        <p className="label">Сообщение жителю</p>
+        <p className="label">{tr('Сообщение жителю', 'Тұрғынға хабарлама')}</p>
         <textarea
           className="input min-h-[64px] resize-y"
           value={reply}
           onChange={(e) => setReply(e.target.value)}
-          placeholder="Напишите ответ — он появится в истории заявки у жителя…"
+          placeholder={tr('Напишите ответ — он появится в истории заявки у жителя…', 'Жауап жазыңыз — ол тұрғынның өтініш тарихында көрінеді…')}
         />
         <button
           className="btn-primary mt-2"
@@ -282,64 +284,44 @@ function ReportDetail({
             setReply('');
           }}
         >
-          <MessageSquare size={16} /> Отправить
+          <MessageSquare size={16} /> {tr('Отправить', 'Жіберу')}
         </button>
       </div>
 
-      {/* Assign contractor toggle */}
-      <button
-        className="btn-ghost mt-4 w-full"
-        onClick={() => setAssigning((v) => !v)}
-      >
-        <HardHat size={16} /> {report.contractor ? 'Сменить подрядчика' : 'Назначить подрядчика'}
-      </button>
-      {assigning && (
-        <div className="mt-3 rounded-xl border border-line p-3">
-          <p className="label">Назначить подрядчика</p>
-          <div className="flex flex-wrap gap-2">
-            {contractors.map((c) => (
-              <button
-                key={c}
-                onClick={() => {
-                  onAssign(report, c);
-                  setAssigning(false);
-                }}
-                className="rounded-full bg-muted px-3 py-1.5 text-xs font-medium hover:bg-line"
-              >
-                {c}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-      {report.contractor && (
-        <p className="mt-2 text-sm text-ink2">
-          Подрядчик: <span className="font-semibold text-ink">{report.contractor}</span>
-        </p>
-      )}
-
-      {/* Quick update */}
+      {/* Quick update — select a status, then confirm below */}
       <div className="mt-4">
-        <p className="label">Быстрое обновление статуса</p>
+        <p className="label">{tr('Выберите новый статус', 'Жаңа статусты таңдаңыз')}</p>
         <div className="flex flex-wrap gap-2">
-          {QUICK_UPDATES.map((u) => (
-            <button
-              key={u.stage}
-              disabled={busy}
-              onClick={() => onStage(report, u)}
-              className="rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-ink2 transition hover:border-primary hover:text-primary disabled:opacity-50"
-            >
-              {u.label}
-            </button>
-          ))}
+          {QUICK_UPDATES.map((u) => {
+            const active = staged?.stage === u.stage;
+            return (
+              <button
+                key={u.stage}
+                disabled={busy}
+                onClick={() => setStaged(active ? null : u)}
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50 ${
+                  active
+                    ? 'border-primary bg-greentint text-primary'
+                    : 'border-line text-ink2 hover:border-primary hover:text-primary'
+                }`}
+              >
+                {tr(u.label, u.labelKk)}
+              </button>
+            );
+          })}
         </div>
+        {staged && (
+          <p className="mt-2 text-xs text-ink3">
+            {tr('Изменение применится после нажатия «Подтвердить».', '«Растау» батырмасын басқаннан кейін өзгеріс қолданылады.')}
+          </p>
+        )}
       </div>
 
       {/* Timeline */}
       <div className="mt-5">
-        <p className="mb-2 text-sm font-semibold">Хронология</p>
+        <p className="mb-2 text-sm font-semibold">{tr('Хронология', 'Хронология')}</p>
         {report.timeline.length === 0 ? (
-          <p className="text-sm text-ink3">Пока нет обновлений.</p>
+          <p className="text-sm text-ink3">{tr('Пока нет обновлений.', 'Әзірге жаңартулар жоқ.')}</p>
         ) : (
           <div className="space-y-0">
             {report.timeline.map((t, i) => (
@@ -369,24 +351,36 @@ function ReportDetail({
 
       {/* Internal note */}
       <div className="mt-3">
-        <p className="label">Внутренняя заметка (видна только администрации)</p>
+        <p className="label">{tr('Внутренняя заметка (видна только администрации)', 'Ішкі ескертпе (тек әкімшілікке көрінеді)')}</p>
         <textarea
           className="input min-h-[64px] resize-y"
           defaultValue={report.internalNote ?? ''}
           onChange={(e) => setNote(e.target.value)}
           onBlur={() => onNote(report, note || report.internalNote || '')}
-          placeholder="Например: ждём доступности подрядчика…"
+          placeholder={tr('Например: ждём доступности подрядчика…', 'Мысалы: мердігердің босауын күтудеміз…')}
         />
       </div>
 
-      {/* Resolve */}
-      <div className="mt-4">
+      {/* Confirm staged status + direct resolve */}
+      <div className="mt-4 flex gap-2">
+        <button
+          onClick={() => {
+            if (staged) {
+              onCommit(report, staged);
+              setStaged(null);
+            }
+          }}
+          className="btn-primary flex-1"
+          disabled={busy || !staged}
+        >
+          <ThumbsUp size={16} /> {tr('Подтвердить', 'Растау')}
+        </button>
         <button
           onClick={() => onResolve(report)}
-          className="btn-primary w-full"
+          className="btn-ghost flex-1"
           disabled={busy || report.status === 'resolved'}
         >
-          <CheckCircle2 size={16} /> Отметить решённой
+          <CheckCircle2 size={16} /> {tr('Отметить решённой', 'Шешілді деп белгілеу')}
         </button>
       </div>
     </Modal>

@@ -5,6 +5,7 @@ import {
   Megaphone,
   BarChart3,
   Users,
+  Contact,
   LogOut,
   Search,
   Bell,
@@ -12,29 +13,33 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAuth } from '../auth';
+import { LangToggle, useI18n } from '../lib/i18n';
 
 interface NavItem {
   to: string;
-  label: string;
+  ru: string;
+  kk: string;
   icon: LucideIcon;
 }
 
 const adminNav: NavItem[] = [
-  { to: '/', label: 'Обзор', icon: LayoutDashboard },
-  { to: '/reports', label: 'Заявки', icon: ClipboardList },
-  { to: '/announcements', label: 'Объявления', icon: Megaphone },
-  { to: '/polls', label: 'Опросы', icon: BarChart3 },
-  { to: '/residents', label: 'Жители', icon: Users },
+  { to: '/', ru: 'Обзор', kk: 'Шолу', icon: LayoutDashboard },
+  { to: '/reports', ru: 'Заявки', kk: 'Өтініштер', icon: ClipboardList },
+  { to: '/announcements', ru: 'Объявления', kk: 'Хабарландырулар', icon: Megaphone },
+  { to: '/polls', ru: 'Опросы', kk: 'Сауалнамалар', icon: BarChart3 },
+  { to: '/residents', ru: 'Жители', kk: 'Тұрғындар', icon: Users },
+  { to: '/contacts', ru: 'Контакты', kk: 'Контактілер', icon: Contact },
 ];
-const superNav: NavItem[] = [{ to: '/', label: 'Районы', icon: Building2 }];
+const superNav: NavItem[] = [{ to: '/', ru: 'Районы', kk: 'Аудандар', icon: Building2 }];
 
 export function Layout() {
   const { user, role, neighborhood, logout } = useAuth();
+  const { t } = useI18n();
   const navigate = useNavigate();
   const isSuper = role === 'super';
   const nav = isSuper ? superNav : adminNav;
-  const chipLabel = isSuper ? 'Супер-админ' : neighborhood || 'Район';
-  const roleLabel = isSuper ? 'Супер-администратор' : 'Администратор';
+  const chipLabel = isSuper ? t('Супер-админ', 'Супер-әкімші') : neighborhood || t('Район', 'Аудан');
+  const roleLabel = isSuper ? t('Супер-администратор', 'Супер-әкімші') : t('Администратор', 'Әкімші');
 
   return (
     <div className="flex h-full">
@@ -44,12 +49,12 @@ export function Layout() {
           <img src="/leaf.svg" className="h-7 w-7" alt="" />
           <div className="leading-tight">
             <p className="font-serif text-xl font-semibold">Korshi</p>
-            <p className="text-xs text-ink3">Админ-панель</p>
+            <p className="text-xs text-ink3">{t('Админ-панель', 'Әкімші панелі')}</p>
           </div>
         </div>
 
         <nav className="flex-1 space-y-1 px-3 py-2">
-          {nav.map(({ to, label, icon: Icon }) => (
+          {nav.map(({ to, ru, kk, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}
@@ -63,7 +68,7 @@ export function Layout() {
               }
             >
               <Icon size={18} />
-              {label}
+              {t(ru, kk)}
             </NavLink>
           ))}
         </nav>
@@ -76,7 +81,7 @@ export function Layout() {
           className="m-3 flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium text-[#D64A3A] transition hover:bg-[#FBE6E1]"
         >
           <LogOut size={18} />
-          Выйти
+          {t('Выйти', 'Шығу')}
         </button>
       </aside>
 
@@ -91,11 +96,12 @@ export function Layout() {
             {!isSuper && (
               <div className="relative w-72">
                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink3" />
-                <input className="input pl-9" placeholder="Поиск по заявкам, жителям…" />
+                <input className="input pl-9" placeholder={t('Поиск по заявкам, жителям…', 'Өтініштер, тұрғындар бойынша іздеу…')} />
               </div>
             )}
           </div>
           <div className="flex items-center gap-4">
+            <LangToggle />
             <button className="grid h-10 w-10 place-items-center rounded-full hover:bg-muted">
               <Bell size={18} className="text-ink2" />
             </button>

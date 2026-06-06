@@ -23,8 +23,8 @@ class ResidentsScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Header(
-                title: 'Жители',
-                subtitle: 'Сообщество района',
+                title: loc('Жители', 'Тұрғындар'),
+                subtitle: loc('Сообщество района', 'Аудан қауымдастығы'),
                 action: FilledButton.icon(
                   onPressed: () => showModalBottomSheet(
                     context: context,
@@ -34,7 +34,7 @@ class ResidentsScreen extends StatelessWidget {
                   ),
                   style: FilledButton.styleFrom(minimumSize: const Size(0, 44), padding: const EdgeInsets.symmetric(horizontal: 12)),
                   icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
-                  label: const Text('Пригласить'),
+                  label: Text(loc('Пригласить', 'Шақыру')),
                 ),
               ),
               Expanded(
@@ -49,10 +49,10 @@ class ResidentsScreen extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('Прогресс сообщества', style: TextStyle(color: C.ink2, fontSize: 13)),
+                                Text(loc('Прогресс сообщества', 'Қауымдастық прогресі'), style: const TextStyle(color: C.ink2, fontSize: 13)),
                                 const SizedBox(height: 4),
-                                Text('${d.connected} из ${d.total}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
-                                const Text('домов подключено', style: TextStyle(color: C.ink3, fontSize: 12)),
+                                Text('${d.connected} ${loc('из', '/')} ${d.total}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+                                Text(loc('домов подключено', 'үй қосылған'), style: const TextStyle(color: C.ink3, fontSize: 12)),
                               ],
                             ),
                           ),
@@ -60,43 +60,8 @@ class ResidentsScreen extends StatelessWidget {
                         ],
                       ),
                     ),
-                    if (d.streets.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      const Text('Обзор улиц', style: TextStyle(fontWeight: FontWeight.w700)),
-                      const SizedBox(height: 8),
-                      for (final s in d.streets)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Panel(
-                            padding: const EdgeInsets.all(12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(s.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                                    Text('${s.total == 0 ? 0 : (s.connected * 100 / s.total).round()}%',
-                                        style: const TextStyle(color: C.primary, fontWeight: FontWeight.w700)),
-                                  ],
-                                ),
-                                const SizedBox(height: 6),
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(6),
-                                  child: LinearProgressIndicator(
-                                    value: s.total == 0 ? 0 : s.connected / s.total,
-                                    minHeight: 6,
-                                    backgroundColor: C.border,
-                                    valueColor: const AlwaysStoppedAnimation(C.primary),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                    ],
                     const SizedBox(height: 16),
-                    Text('Жители (${d.residents.length})', style: const TextStyle(fontWeight: FontWeight.w700)),
+                    Text('${loc('Жители', 'Тұрғындар')} (${d.residents.length})', style: const TextStyle(fontWeight: FontWeight.w700)),
                     const SizedBox(height: 8),
                     for (final r in d.residents) ...[
                       _residentTile(r),
@@ -144,11 +109,11 @@ class ResidentsScreen extends StatelessWidget {
   Widget _statusBadge(String s) {
     switch (s) {
       case 'active':
-        return const Pill('Активен', bg: Color(0xFFE2F0E8), fg: C.primary);
+        return Pill(loc('Активен', 'Белсенді'), bg: const Color(0xFFE2F0E8), fg: C.primary);
       case 'invited':
-        return const Pill('Приглашён', bg: Color(0xFFFBEFD6), fg: C.warn);
+        return Pill(loc('Приглашён', 'Шақырылды'), bg: const Color(0xFFFBEFD6), fg: C.warn);
       default:
-        return const Pill('Не подключён', bg: C.muted, fg: C.ink2);
+        return Pill(loc('Не подключён', 'Қосылмаған'), bg: C.muted, fg: C.ink2);
     }
   }
 }
@@ -183,7 +148,7 @@ class _InviteSheetState extends State<_InviteSheet> {
 
   Future<void> _create() async {
     if (_phone.text.trim().isEmpty || _address.text.trim().isEmpty || _busy) {
-      setState(() => _error = 'Укажите телефон и адрес');
+      setState(() => _error = loc('Укажите телефон и адрес', 'Телефон мен мекенжайды көрсетіңіз'));
       return;
     }
     setState(() {
@@ -214,13 +179,13 @@ class _InviteSheetState extends State<_InviteSheet> {
           controller: controller,
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
           children: [
-            const Text('Пригласить жителя', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            Text(loc('Пригласить жителя', 'Тұрғынды шақыру'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
             const SizedBox(height: 16),
-            TextField(controller: _phone, enabled: _code == null, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Телефон *', hintText: '+7 7__ ___ __ __')),
+            TextField(controller: _phone, enabled: _code == null, keyboardType: TextInputType.phone, decoration: InputDecoration(labelText: loc('Телефон *', 'Телефон *'), hintText: '+7 7__ ___ __ __')),
             const SizedBox(height: 12),
-            TextField(controller: _address, enabled: _code == null, decoration: const InputDecoration(labelText: 'Адрес *', hintText: 'ул. Абая, 27')),
+            TextField(controller: _address, enabled: _code == null, decoration: InputDecoration(labelText: loc('Адрес *', 'Мекенжай *'), hintText: 'ул. Абая, 27')),
             const SizedBox(height: 12),
-            TextField(controller: _name, enabled: _code == null, decoration: const InputDecoration(labelText: 'Имя (необязательно)')),
+            TextField(controller: _name, enabled: _code == null, decoration: InputDecoration(labelText: loc('Имя (необязательно)', 'Аты (міндетті емес)'))),
             if (_error != null) ...[
               const SizedBox(height: 10),
               Text(_error!, style: const TextStyle(color: C.danger)),
@@ -231,17 +196,17 @@ class _InviteSheetState extends State<_InviteSheet> {
                 onPressed: _busy ? null : _create,
                 child: _busy
                     ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white))
-                    : const Text('Создать код активации'),
+                    : Text(loc('Создать код активации', 'Белсендіру кодын жасау')),
               )
             else ...[
               Panel(
                 child: Column(
                   children: [
-                    const Text('Код активации', style: TextStyle(color: C.ink2, fontSize: 13)),
+                    Text(loc('Код активации', 'Белсендіру коды'), style: const TextStyle(color: C.ink2, fontSize: 13)),
                     const SizedBox(height: 4),
                     Text(_code!, style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w800, letterSpacing: 6, color: C.primary)),
                     const SizedBox(height: 4),
-                    const Text('Код не истекает', style: TextStyle(color: C.ink3, fontSize: 12)),
+                    Text(loc('Код не истекает', 'Кодтың мерзімі бітпейді'), style: const TextStyle(color: C.ink3, fontSize: 12)),
                   ],
                 ),
               ),
@@ -253,19 +218,19 @@ class _InviteSheetState extends State<_InviteSheet> {
                 },
                 style: FilledButton.styleFrom(backgroundColor: const Color(0xFF25D366)),
                 icon: const Icon(Icons.chat_rounded, size: 18),
-                label: const Text('Отправить через WhatsApp'),
+                label: Text(loc('Отправить через WhatsApp', 'WhatsApp арқылы жіберу')),
               ),
               const SizedBox(height: 8),
               OutlinedButton.icon(
                 onPressed: () {
                   Clipboard.setData(ClipboardData(text: _message));
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Скопировано')));
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc('Скопировано', 'Көшірілді'))));
                 },
                 icon: const Icon(Icons.copy_rounded, size: 18),
-                label: const Text('Скопировать приглашение'),
+                label: Text(loc('Скопировать приглашение', 'Шақыруды көшіру')),
               ),
               const SizedBox(height: 8),
-              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Готово')),
+              TextButton(onPressed: () => Navigator.pop(context), child: Text(loc('Готово', 'Дайын'))),
             ],
           ],
         ),

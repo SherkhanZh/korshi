@@ -26,10 +26,14 @@ class AsyncView<T> extends StatefulWidget {
 class _AsyncViewState<T> extends State<AsyncView<T>> {
   late Future<T> _future;
 
+  /// Last successfully loaded value. Kept so a refresh keeps showing the current
+  /// content while new data loads (stale-while-revalidate) instead of blanking.
+  T? _data;
+
   @override
   void initState() {
     super.initState();
-    _future = widget.create();
+    _future = _track(widget.create());
     widget.refresh?.addListener(_retry);
   }
 
@@ -39,8 +43,16 @@ class _AsyncViewState<T> extends State<AsyncView<T>> {
     super.dispose();
   }
 
+  /// Remembers the resolved value of [f] for stale-while-revalidate.
+  Future<T> _track(Future<T> f) {
+    f.then((v) {
+      if (mounted) setState(() => _data = v);
+    }).catchError((_) {});
+    return f;
+  }
+
   void _retry() {
-    if (mounted) setState(() => _future = widget.create());
+    if (mounted) setState(() => _future = _track(widget.create()));
   }
 
   @override
@@ -49,6 +61,8 @@ class _AsyncViewState<T> extends State<AsyncView<T>> {
       future: _future,
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
+          // Keep prior content visible while revalidating.
+          if (_data != null) return widget.builder(context, _data as T);
           return const Center(
             child: Padding(
               padding: EdgeInsets.all(48),
@@ -57,6 +71,8 @@ class _AsyncViewState<T> extends State<AsyncView<T>> {
           );
         }
         if (snap.hasError || !snap.hasData) {
+          // Prefer stale data over an error screen when we have something.
+          if (_data != null) return widget.builder(context, _data as T);
           return Center(
             child: Padding(
               padding: widget.padding,

@@ -284,7 +284,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: GestureDetector(
                 onTap: () {
                   setState(() => _lang = i);
-                  appLocale.value = Locale(codes[i]);
+                  setLocale(codes[i]);
                 },
                 child: Container(
                   height: 44,

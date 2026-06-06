@@ -2,10 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../theme.dart';
-import 'announcements.dart';
+import 'contacts.dart';
 import 'dashboard.dart';
-import 'polls.dart';
-import 'reports.dart';
 import 'residents.dart';
 
 class AdminShell extends StatefulWidget {
@@ -19,10 +17,8 @@ class _AdminShellState extends State<AdminShell> {
 
   static const _pages = [
     DashboardScreen(),
-    ReportsScreen(),
-    AnnouncementsScreen(),
-    PollsScreen(),
     ResidentsScreen(),
+    ContactsScreen(),
   ];
 
   @override
@@ -55,14 +51,14 @@ class _AdminShellState extends State<AdminShell> {
               children: [
                 const Icon(Icons.admin_panel_settings_rounded, size: 48, color: C.ink3),
                 const SizedBox(height: 12),
-                const Text('Это приложение для председателей района.',
+                Text(loc('Это приложение для председателей района.', 'Бұл қосымша аудан төрағаларына арналған.'),
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontWeight: FontWeight.w600)),
+                    style: const TextStyle(fontWeight: FontWeight.w600)),
                 const SizedBox(height: 6),
-                const Text('Супер-админ управляет районами в веб-панели.',
-                    textAlign: TextAlign.center, style: TextStyle(color: C.ink2)),
+                Text(loc('Супер-админ управляет районами в веб-панели.', 'Супер-әкімші аудандарды веб-панельде басқарады.'),
+                    textAlign: TextAlign.center, style: const TextStyle(color: C.ink2)),
                 const SizedBox(height: 20),
-                FilledButton(onPressed: clearSession, child: const Text('Выйти')),
+                FilledButton(onPressed: clearSession, child: Text(loc('Выйти', 'Шығу'))),
               ],
             ),
           ),
@@ -80,12 +76,10 @@ class _AdminShellState extends State<AdminShell> {
         },
         backgroundColor: C.surface,
         indicatorColor: C.greenTint,
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard_rounded), label: 'Обзор'),
-          NavigationDestination(icon: Icon(Icons.assignment_outlined), selectedIcon: Icon(Icons.assignment_rounded), label: 'Заявки'),
-          NavigationDestination(icon: Icon(Icons.campaign_outlined), selectedIcon: Icon(Icons.campaign_rounded), label: 'Объявл.'),
-          NavigationDestination(icon: Icon(Icons.how_to_vote_outlined), selectedIcon: Icon(Icons.how_to_vote_rounded), label: 'Опросы'),
-          NavigationDestination(icon: Icon(Icons.people_outline_rounded), selectedIcon: Icon(Icons.people_rounded), label: 'Жители'),
+        destinations: [
+          NavigationDestination(icon: const Icon(Icons.dashboard_outlined), selectedIcon: const Icon(Icons.dashboard_rounded), label: loc('Обзор', 'Шолу')),
+          NavigationDestination(icon: const Icon(Icons.people_outline_rounded), selectedIcon: const Icon(Icons.people_rounded), label: loc('Жители', 'Тұрғындар')),
+          NavigationDestination(icon: const Icon(Icons.contacts_outlined), selectedIcon: const Icon(Icons.contacts_rounded), label: loc('Контакты', 'Контактілер')),
         ],
       ),
     );

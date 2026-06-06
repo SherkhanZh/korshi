@@ -229,6 +229,50 @@ class UpdateItem {
       );
 }
 
+/// A row in the notification inbox.
+class NotificationItem {
+  const NotificationItem({
+    required this.id,
+    required this.type,
+    required this.refId,
+    required this.title,
+    required this.body,
+    required this.date,
+    required this.read,
+  });
+
+  final String id;
+  final String type; // 'report' | 'announcement' | 'poll'
+  final String refId; // id of the report / announcement / poll
+  final String title;
+  final String body;
+  final String date;
+  final bool read;
+
+  factory NotificationItem.fromJson(Map<String, dynamic> j) => NotificationItem(
+        id: j['id'] as String? ?? '',
+        type: j['type'] as String? ?? '',
+        refId: j['refId'] as String? ?? '',
+        title: j['title'] as String? ?? '',
+        body: j['body'] as String? ?? '',
+        date: j['date'] as String? ?? '',
+        read: j['read'] as bool? ?? false,
+      );
+}
+
+class NotificationsData {
+  const NotificationsData({required this.unread, required this.items});
+  final int unread;
+  final List<NotificationItem> items;
+
+  factory NotificationsData.fromJson(Map<String, dynamic> j) => NotificationsData(
+        unread: (j['unread'] as num?)?.toInt() ?? 0,
+        items: ((j['items'] as List?) ?? [])
+            .map((e) => NotificationItem.fromJson((e as Map).cast<String, dynamic>()))
+            .toList(),
+      );
+}
+
 /// A contact card (chairman, police, services, emergency, partners).
 class ContactItem {
   const ContactItem({
@@ -349,6 +393,7 @@ class ActivePoll {
     required this.households,
     required this.endsInDays,
     required this.voted,
+    required this.votedOptionId,
     required this.confidential,
     required this.voters,
   });
@@ -362,6 +407,9 @@ class ActivePoll {
   final int households;
   final int endsInDays;
   final bool voted;
+
+  /// The option id this resident voted for, or -1 if they haven't voted.
+  final int votedOptionId;
   final bool confidential;
   final List<PollVoter> voters;
 
@@ -380,6 +428,7 @@ class ActivePoll {
         households: j['households'] as int? ?? 0,
         endsInDays: j['endsInDays'] as int? ?? 0,
         voted: j['voted'] as bool? ?? false,
+        votedOptionId: (j['votedOptionId'] as num?)?.toInt() ?? -1,
         confidential: j['confidential'] as bool? ?? true,
         voters: ((j['voters'] as List?) ?? [])
             .map((e) => PollVoter.fromJson((e as Map).cast<String, dynamic>()))

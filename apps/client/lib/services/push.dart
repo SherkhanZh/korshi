@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
@@ -39,6 +40,24 @@ class PushService {
       if (authToken.value != null) repository.registerPushToken(t);
     });
 
+    // Foreground messages: refresh any open list/detail so a status change is
+    // reflected immediately, then surface an in-app banner (FCM doesn't show the
+    // tray notification while the app is in the foreground).
+    FirebaseMessaging.onMessage.listen((m) {
+      dataVersion.value++;
+      final n = m.notification;
+      if (n == null) return;
+      final text = [n.title, n.body].where((s) => s != null && s.isNotEmpty).join(': ');
+      if (text.isEmpty) return;
+      scaffoldMessengerKey.currentState
+        ?..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(
+          content: Text(text),
+          behavior: SnackBarBehavior.floating,
+          action: SnackBarAction(label: 'Открыть', onPressed: () => _handleTap(m)),
+        ));
+    });
+
     // Tap handling (background → foreground, and cold start).
     FirebaseMessaging.onMessageOpenedApp.listen(_handleTap);
     final initial = await FirebaseMessaging.instance.getInitialMessage();
@@ -66,12 +85,10 @@ class PushService {
   }
 
   static void _handleTap(RemoteMessage message) {
-    final type = message.data['type'];
-    if (type == 'poll') {
-      shellTab.value = 3;
-    } else {
-      // report or announcement → Updates tab.
-      shellTab.value = 1;
-    }
+    dataVersion.value++; // ensure the destination tab shows fresh data
+    final type = message.data['type']?.toString() ?? '';
+    final id = message.data['id']?.toString() ?? '';
+    // Switch to the right tab and queue the specific item to open.
+    openNotifTarget(type.isEmpty ? 'announcement' : type, id);
   }
 }

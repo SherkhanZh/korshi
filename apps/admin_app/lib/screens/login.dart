@@ -28,7 +28,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _submit() async {
     if (_busy) return;
     if (_email.text.trim().isEmpty || _password.text.isEmpty) {
-      setState(() => _error = 'Введите email и пароль');
+      setState(() => _error = loc('Введите email и пароль', 'Email және құпиясөзді енгізіңіз'));
       return;
     }
     setState(() {
@@ -71,24 +71,24 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: const Icon(Icons.eco_rounded, color: C.primary),
                       ),
                       const SizedBox(width: 12),
-                      const Column(
+                      Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Korshi', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
-                          Text('Кабинет председателя',
-                              style: TextStyle(color: C.ink3, fontSize: 13)),
+                          const Text('Korshi', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
+                          Text(loc('Кабинет председателя', 'Төраға кабинеті'),
+                              style: const TextStyle(color: C.ink3, fontSize: 13)),
                         ],
                       ),
                     ],
                   ),
                   const SizedBox(height: 24),
-                  const Text('Вход', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+                  Text(loc('Вход', 'Кіру'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 16),
-                  const Text('Эл. почта', style: TextStyle(fontWeight: FontWeight.w600)),
+                  Text(loc('Эл. почта', 'Эл. пошта'), style: const TextStyle(fontWeight: FontWeight.w600)),
                   const SizedBox(height: 6),
                   TextField(controller: _email, keyboardType: TextInputType.emailAddress),
                   const SizedBox(height: 14),
-                  const Text('Пароль', style: TextStyle(fontWeight: FontWeight.w600)),
+                  Text(loc('Пароль', 'Құпиясөз'), style: const TextStyle(fontWeight: FontWeight.w600)),
                   const SizedBox(height: 6),
                   TextField(
                     controller: _password,
@@ -120,11 +120,11 @@ class _LoginScreenState extends State<LoginScreen> {
                         ? const SizedBox(
                             width: 22, height: 22,
                             child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white))
-                        : const Text('Войти'),
+                        : Text(loc('Войти', 'Кіру')),
                   ),
                   const SizedBox(height: 12),
                   const Center(
-                    child: Text('По умолчанию: admin@korshi.kz / admin123',
+                    child: Text('admin@korshi.kz / admin123',
                         style: TextStyle(color: C.ink3, fontSize: 12)),
                   ),
                 ],

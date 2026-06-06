@@ -7,11 +7,13 @@ import { pollStatusMeta, pollCategoryMeta } from '../lib/meta';
 import type { Poll, PollCategory } from '../types';
 import { fetchPolls, createPoll, deletePoll } from '../lib/api';
 import { useAsync } from '../lib/useAsync';
+import { useI18n } from '../lib/i18n';
 
 const CATEGORIES = Object.keys(pollCategoryMeta) as PollCategory[];
 const DURATIONS = [3, 7, 14];
 
 export function Polls() {
+  const { t: tr } = useI18n();
   const { data, loading, error, reload } = useAsync(fetchPolls, []);
   const [items, setItems] = useState<Poll[]>([]);
   const [open, setOpen] = useState(false);
@@ -55,7 +57,7 @@ export function Polls() {
   };
 
   const remove = async (id: string) => {
-    if (!confirm('Удалить этот опрос?')) return;
+    if (!confirm(tr('Удалить этот опрос?', 'Бұл сауалнаманы жою керек пе?'))) return;
     setItems((prev) => prev.filter((p) => p.id !== id));
     try {
       await deletePoll(id);
@@ -83,23 +85,23 @@ export function Polls() {
       setOpen(false);
       reload();
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'Не удалось создать опрос');
+      alert(e instanceof Error ? e.message : tr('Не удалось создать опрос', 'Сауалнама құру мүмкін болмады'));
     } finally {
       setBusy(false);
     }
   };
 
-  if (loading) return <div className="p-10 text-center text-ink3">Загрузка…</div>;
+  if (loading) return <div className="p-10 text-center text-ink3">{tr('Загрузка…', 'Жүктелуде…')}</div>;
   if (error) return <div className="p-10 text-center text-[#C0492E]">{error}</div>;
 
   return (
     <div>
       <PageHeader
-        title="Опросы"
-        subtitle="Спросите мнение жителей"
+        title={tr('Опросы', 'Сауалнамалар')}
+        subtitle={tr('Спросите мнение жителей', 'Тұрғындардың пікірін сұраңыз')}
         action={
           <button className="btn-primary" onClick={() => { reset(); setOpen(true); }}>
-            <Plus size={16} /> Создать опрос
+            <Plus size={16} /> {tr('Создать опрос', 'Сауалнама құру')}
           </button>
         }
       />
@@ -113,10 +115,10 @@ export function Polls() {
           return (
             <div key={p.id} className="card p-5">
               <div className="mb-2 flex items-center gap-2">
-                <Badge label={st.label} bg={st.bg} fg={st.fg} />
+                <Badge label={tr(st.label, st.labelKk)} bg={st.bg} fg={st.fg} />
                 {cm && (
                   <span className="inline-flex items-center gap-1 text-xs font-medium" style={{ color: cm.color }}>
-                    <cm.icon size={13} /> {cm.label}
+                    <cm.icon size={13} /> {tr(cm.label, cm.labelKk)}
                   </span>
                 )}
                 <span
@@ -128,11 +130,11 @@ export function Polls() {
                   }
                 >
                   {p.confidential ? <Lock size={11} /> : <Globe size={11} />}
-                  {p.confidential ? 'Конфиденциально' : 'Открытый'}
+                  {p.confidential ? tr('Конфиденциально', 'Құпия') : tr('Открытый', 'Ашық')}
                 </span>
                 <button
                   onClick={() => remove(p.id)}
-                  title="Удалить опрос"
+                  title={tr('Удалить опрос', 'Сауалнаманы жою')}
                   className="ml-auto grid h-8 w-8 place-items-center rounded-lg text-ink3 hover:bg-[#FBE6E1] hover:text-[#C0492E]"
                 >
                   <Trash2 size={16} />
@@ -158,7 +160,7 @@ export function Polls() {
 
               {!p.confidential && p.voters.length > 0 && (
                 <div className="mt-3 rounded-xl bg-muted/60 p-3">
-                  <p className="mb-1 text-xs font-semibold text-ink2">Как проголосовали:</p>
+                  <p className="mb-1 text-xs font-semibold text-ink2">{tr('Как проголосовали:', 'Қалай дауыс берді:')}</p>
                   <div className="space-y-0.5 text-xs text-ink3">
                     {p.voters.map((v, i) => (
                       <p key={i}>
@@ -170,22 +172,22 @@ export function Polls() {
               )}
 
               <div className="mt-4 flex items-center justify-between border-t border-line/60 pt-3 text-xs text-ink3">
-                <span className="flex items-center gap-1.5"><Users size={14} /> {p.households} домохозяйств</span>
-                <span className="flex items-center gap-1.5"><Clock size={14} /> до {p.endsAt}</span>
+                <span className="flex items-center gap-1.5"><Users size={14} /> {p.households} {tr('домохозяйств', 'үй шаруашылығы')}</span>
+                <span className="flex items-center gap-1.5"><Clock size={14} /> {tr('до', 'дейін')} {p.endsAt}</span>
               </div>
             </div>
           );
         })}
         {items.length === 0 && (
-          <div className="card p-10 text-center text-ink3 lg:col-span-2">Опросов пока нет</div>
+          <div className="card p-10 text-center text-ink3 lg:col-span-2">{tr('Опросов пока нет', 'Әзірге сауалнамалар жоқ')}</div>
         )}
       </div>
 
-      <Modal open={open} title="Создать опрос" onClose={() => setOpen(false)} width={560}>
+      <Modal open={open} title={tr('Создать опрос', 'Сауалнама құру')} onClose={() => setOpen(false)} width={560}>
         <div className="space-y-5">
           {/* Category (optional, toggleable) */}
           <div>
-            <p className="label">Категория (необязательно)</p>
+            <p className="label">{tr('Категория (необязательно)', 'Санат (міндетті емес)')}</p>
             <div className="grid grid-cols-5 gap-2">
               {CATEGORIES.map((c) => {
                 const m = pollCategoryMeta[c];
@@ -202,55 +204,55 @@ export function Polls() {
                     }}
                   >
                     <m.icon size={18} style={{ color: m.color }} />
-                    {m.label}
+                    {tr(m.label, m.labelKk)}
                   </button>
                 );
               })}
             </div>
             {category && (
               <button onClick={() => setCategory(null)} className="mt-2 text-xs font-medium text-ink3 hover:text-ink">
-                Сбросить категорию
+                {tr('Сбросить категорию', 'Санатты алып тастау')}
               </button>
             )}
           </div>
 
           {/* Question RU + KK */}
           <div>
-            <p className="label">Вопрос</p>
+            <p className="label">{tr('Вопрос', 'Сұрақ')}</p>
             <textarea
               className="input min-h-[56px] resize-y"
+              maxLength={200}
+              value={questionKk}
+              onChange={(e) => setQuestionKk(e.target.value)}
+              placeholder="Қазақша — мыс.: Кіреберіске шлагбаум орнату керек пе?"
+            />
+            <textarea
+              className="input mt-2 min-h-[56px] resize-y"
               maxLength={200}
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
               placeholder="Русский — напр.: Установить шлагбаум на въезде?"
             />
-            <textarea
-              className="input mt-2 min-h-[56px] resize-y"
-              maxLength={200}
-              value={questionKk}
-              onChange={(e) => setQuestionKk(e.target.value)}
-              placeholder="Қазақша — напр.: Кіреберіске шлагбаум орнату керек пе?"
-            />
           </div>
 
           {/* Options RU + KK */}
           <div>
-            <p className="label">Варианты ответа (рус / қаз)</p>
+            <p className="label">{tr('Варианты ответа (қаз / рус)', 'Жауап нұсқалары (қаз / рус)')}</p>
             <div className="space-y-2">
               {optionsRu.map((o, i) => (
                 <div key={i} className="flex items-center gap-2">
                   <div className="flex flex-1 flex-col gap-1.5">
                     <input
                       className="input"
-                      value={o}
-                      onChange={(e) => setOpt(i, 'ru', e.target.value)}
-                      placeholder={`Вариант ${i + 1} (рус)`}
-                    />
-                    <input
-                      className="input"
                       value={optionsKk[i] ?? ''}
                       onChange={(e) => setOpt(i, 'kk', e.target.value)}
                       placeholder={`${i + 1}-нұсқа (қаз)`}
+                    />
+                    <input
+                      className="input"
+                      value={o}
+                      onChange={(e) => setOpt(i, 'ru', e.target.value)}
+                      placeholder={`Вариант ${i + 1} (рус)`}
                     />
                   </div>
                   {optionsRu.length > 2 && (
@@ -267,14 +269,14 @@ export function Polls() {
                 onClick={addOpt}
                 className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-line py-2.5 text-sm font-medium text-ink2 hover:border-primary hover:text-primary"
               >
-                <Plus size={16} /> Добавить вариант
+                <Plus size={16} /> {tr('Добавить вариант', 'Нұсқа қосу')}
               </button>
             </div>
           </div>
 
           {/* Visibility */}
           <div>
-            <p className="label">Видимость голосов</p>
+            <p className="label">{tr('Видимость голосов', 'Дауыстардың көрінуі')}</p>
             <div className="flex gap-2">
               <button
                 onClick={() => setConfidential(true)}
@@ -282,7 +284,7 @@ export function Polls() {
                   confidential ? 'border-primary bg-greentint text-primary' : 'border-line'
                 }`}
               >
-                <Lock size={15} /> Конфиденциально
+                <Lock size={15} /> {tr('Конфиденциально', 'Құпия')}
               </button>
               <button
                 onClick={() => setConfidential(false)}
@@ -290,20 +292,20 @@ export function Polls() {
                   !confidential ? 'border-primary bg-greentint text-primary' : 'border-line'
                 }`}
               >
-                <Globe size={15} /> Открытый
+                <Globe size={15} /> {tr('Открытый', 'Ашық')}
               </button>
             </div>
             <p className="mt-1 text-xs text-ink3">
               {confidential
-                ? 'Никто не видит, кто как проголосовал.'
-                : 'Жители и администратор видят, кто за что проголосовал.'}
+                ? tr('Никто не видит, кто как проголосовал.', 'Кімнің қалай дауыс бергенін ешкім көрмейді.')
+                : tr('Жители и администратор видят, кто за что проголосовал.', 'Тұрғындар мен әкімші кімнің не үшін дауыс бергенін көреді.')}
             </p>
           </div>
 
           {/* Duration + audience */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="label">Длительность</p>
+              <p className="label">{tr('Длительность', 'Ұзақтығы')}</p>
               <div className="flex gap-2">
                 {DURATIONS.map((d) => (
                   <button
@@ -313,13 +315,13 @@ export function Polls() {
                       duration === d ? 'border-primary bg-greentint text-primary' : 'border-line'
                     }`}
                   >
-                    {d} дн.
+                    {d} {tr('дн.', 'күн')}
                   </button>
                 ))}
               </div>
             </div>
             <div>
-              <p className="label">Аудитория</p>
+              <p className="label">{tr('Аудитория', 'Аудитория')}</p>
               <div className="flex gap-2">
                 <button
                   onClick={() => setAudience('all')}
@@ -327,7 +329,7 @@ export function Polls() {
                     audience === 'all' ? 'border-primary bg-greentint text-primary' : 'border-line'
                   }`}
                 >
-                  <Users size={15} /> Весь район
+                  <Users size={15} /> {tr('Весь район', 'Бүкіл аудан')}
                 </button>
                 <button
                   onClick={() => setAudience('street')}
@@ -335,16 +337,16 @@ export function Polls() {
                     audience === 'street' ? 'border-primary bg-greentint text-primary' : 'border-line'
                   }`}
                 >
-                  <Home size={15} /> Улица
+                  <Home size={15} /> {tr('Улица', 'Көше')}
                 </button>
               </div>
             </div>
           </div>
 
           <div className="flex justify-end gap-2">
-            <button className="btn-ghost" onClick={() => setOpen(false)}>Отмена</button>
+            <button className="btn-ghost" onClick={() => setOpen(false)}>{tr('Отмена', 'Болдырмау')}</button>
             <button className="btn-primary" onClick={start} disabled={busy}>
-              {busy ? 'Создаём…' : 'Запустить опрос'}
+              {busy ? tr('Создаём…', 'Құрылуда…') : tr('Запустить опрос', 'Сауалнаманы іске қосу')}
             </button>
           </div>
         </div>

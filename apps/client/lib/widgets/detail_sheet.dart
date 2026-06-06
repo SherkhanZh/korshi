@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../app_state.dart';
 import '../l10n/app_localizations.dart';
 import '../models/models.dart';
 import '../services/api_client.dart';
@@ -12,6 +13,23 @@ import 'common.dart';
 
 String? _reportPhotoUrl(ReportItem r) =>
     r.hasPhoto ? '${ApiConfig.baseUrl}/reports/${r.id}/photo' : null;
+
+/// Server-stored timeline labels/dates are Russian. Translate the known set so
+/// the status history reads in Kazakh when the app is in Kazakh.
+const Map<String, String> _stepKk = {
+  'Отправлено': 'Жіберілді',
+  'Ожидает ответа': 'Жауап күтуде',
+  'Рассмотрение': 'Қаралуда',
+  'Решено': 'Шешілді',
+  'Опубликовано': 'Жарияланды',
+  'Актуально': 'Өзекті',
+  'сейчас': 'қазір',
+  'недавно': 'жуырда',
+  'Заявка получена. Ожидает рассмотрения председателем.':
+      'Өтініш қабылданды. Төрағаның қарауын күтуде.',
+};
+
+String _trStep(String s) => loc(s, _stepKk[s]);
 
 /// Opens the detail sheet for a submitted report (My reports), loading the full
 /// detail (author, history, chairman updates) by id.
@@ -71,6 +89,7 @@ void showUpdateSheet(
   String? author,
 }) {
   // Hardcoded history for feed items (no per-item timeline from the API yet).
+  // Labels are translated at render time by _trStep.
   final history = <TimelineStep>[
     TimelineStep(label: 'Опубликовано', date: date, state: TimelineStepState.done),
     if (status == AppStatus.resolved)
@@ -85,7 +104,7 @@ void showUpdateSheet(
       status: status,
       title: title,
       date: date,
-      author: author ?? 'Администрация района',
+      author: author ?? loc('Администрация района', 'Аудан әкімшілігі'),
       body: body,
       history: history,
       updates: const [],
@@ -197,12 +216,17 @@ class _DetailBody extends StatelessWidget {
                       fontSize: 21,
                       fontWeight: FontWeight.w700,
                       color: AppColors.textPrimary)),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               Row(
                 children: [
                   Icon(Icons.calendar_today_rounded, size: 14, color: status.fg),
                   const SizedBox(width: 6),
-                  Text(date, style: TextStyle(color: status.fg, fontSize: 13)),
+                  Expanded(
+                    child: Text(date,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: status.fg, fontSize: 13)),
+                  ),
                 ],
               ),
             ],
@@ -224,28 +248,32 @@ class _DetailBody extends StatelessWidget {
                       child: Icon(Icons.person_rounded, color: AppColors.primary, size: 20),
                     ),
                     const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Автор',
-                            style: TextStyle(color: AppColors.textTertiary, fontSize: 12)),
-                        Text(author,
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w700, fontSize: 15)),
-                      ],
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(loc('Автор', 'Автор'),
+                              style: const TextStyle(color: AppColors.textTertiary, fontSize: 12)),
+                          Text(author,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w700, fontSize: 15)),
+                        ],
+                      ),
                     ),
                   ],
                 ),
               ),
               if (body.trim().isNotEmpty) ...[
                 const SizedBox(height: 16),
-                Text('Описание', style: AppTheme.cardTitle.copyWith(fontSize: 16)),
+                Text(loc('Описание', 'Сипаттама'), style: AppTheme.cardTitle.copyWith(fontSize: 16)),
                 const SizedBox(height: 8),
                 AppCard(child: Text(body, style: AppTheme.body.copyWith(height: 1.5))),
               ],
               if (photoUrl != null) ...[
                 const SizedBox(height: 16),
-                Text('Фото', style: AppTheme.cardTitle.copyWith(fontSize: 16)),
+                Text(loc('Фото', 'Фото'), style: AppTheme.cardTitle.copyWith(fontSize: 16)),
                 const SizedBox(height: 8),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(14),
@@ -263,18 +291,19 @@ class _DetailBody extends StatelessWidget {
                         color: AppColors.surfaceMuted,
                         borderRadius: BorderRadius.circular(14),
                       ),
-                      child: Text('Не удалось загрузить фото', style: AppTheme.subtle),
+                      child: Text(loc('Не удалось загрузить фото', 'Фотоны жүктеу мүмкін болмады'),
+                          style: AppTheme.subtle),
                     ),
                   ),
                 ),
               ],
               const SizedBox(height: 16),
-              Text('История статусов', style: AppTheme.cardTitle.copyWith(fontSize: 16)),
+              Text(loc('История статусов', 'Мәртебе тарихы'), style: AppTheme.cardTitle.copyWith(fontSize: 16)),
               const SizedBox(height: 10),
               AppCard(child: _History(history: history)),
               if (updates.isNotEmpty) ...[
                 const SizedBox(height: 16),
-                Text('Сообщения председателя',
+                Text(loc('Сообщения председателя', 'Төраға хабарламалары'),
                     style: AppTheme.cardTitle.copyWith(fontSize: 16)),
                 const SizedBox(height: 10),
                 for (final u in updates) ...[
@@ -283,14 +312,15 @@ class _DetailBody extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         SizedBox(
-                          width: 52,
-                          child: Text(u.date,
+                          width: 60,
+                          child: Text(_trStep(u.date),
                               style: const TextStyle(
                                   color: AppColors.primary,
                                   fontWeight: FontWeight.w600,
                                   fontSize: 13)),
                         ),
-                        Expanded(child: Text(u.body, style: AppTheme.body)),
+                        const SizedBox(width: 16),
+                        Expanded(child: Text(_trStep(u.body), style: AppTheme.body)),
                       ],
                     ),
                   ),
@@ -332,11 +362,11 @@ class _History extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(history[i].label,
+                        Text(_trStep(history[i].label),
                             style: const TextStyle(
                                 fontWeight: FontWeight.w600, fontSize: 14)),
                         if (history[i].date != null)
-                          Text(history[i].date!,
+                          Text(_trStep(history[i].date!),
                               style: const TextStyle(
                                   color: AppColors.textTertiary, fontSize: 12)),
                       ],

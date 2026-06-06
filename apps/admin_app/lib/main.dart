@@ -8,6 +8,7 @@ import 'theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await loadLocale();
   await loadSession();
   await PushService.init();
   if (isLoggedIn) PushService.registerIfPossible();
@@ -19,13 +20,23 @@ class KorshiAdminApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Korshi — Председатель',
-      debugShowCheckedModeBanner: false,
-      theme: korshiTheme(),
-      home: ValueListenableBuilder<String?>(
-        valueListenable: adminToken,
-        builder: (context, token, _) => token == null ? const LoginScreen() : const AdminShell(),
+    // Rebuild the whole app when the language changes so loc() re-evaluates.
+    // The screens are const widgets, so an ancestor rebuild alone won't refresh
+    // them — keying the subtree by locale forces a full rebuild on switch.
+    return ValueListenableBuilder<String>(
+      valueListenable: adminLocale,
+      builder: (context, lang, __) => MaterialApp(
+        title: 'Korshi — Председатель',
+        debugShowCheckedModeBanner: false,
+        scaffoldMessengerKey: adminMessengerKey,
+        theme: korshiTheme(),
+        home: ValueListenableBuilder<String?>(
+          valueListenable: adminToken,
+          builder: (context, token, _) => KeyedSubtree(
+            key: ValueKey('lang-$lang'),
+            child: token == null ? const LoginScreen() : const AdminShell(),
+          ),
+        ),
       ),
     );
   }

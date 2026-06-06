@@ -11,14 +11,39 @@ import 'theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await loadLocale();
   await loadSession();
   await PushService.init();
   if (isLoggedIn) PushService.registerIfPossible();
   runApp(const KorshiApp());
 }
 
-class KorshiApp extends StatelessWidget {
+class KorshiApp extends StatefulWidget {
   const KorshiApp({super.key});
+
+  @override
+  State<KorshiApp> createState() => _KorshiAppState();
+}
+
+class _KorshiAppState extends State<KorshiApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Coming back to the app (e.g. after tapping a notification or switching
+    // away) re-fetches open screens so statuses and new items are current.
+    if (state == AppLifecycleState.resumed) dataVersion.value++;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -28,6 +53,7 @@ class KorshiApp extends StatelessWidget {
         return MaterialApp(
           title: 'Korshi',
           debugShowCheckedModeBanner: false,
+          scaffoldMessengerKey: scaffoldMessengerKey,
           theme: AppTheme.light(),
           locale: locale,
           supportedLocales: AppLocalizations.supportedLocales,

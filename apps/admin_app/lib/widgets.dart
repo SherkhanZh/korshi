@@ -48,10 +48,10 @@ class _LoaderState<T> extends State<Loader<T>> {
               children: [
                 const Icon(Icons.cloud_off_rounded, size: 40, color: C.ink3),
                 const SizedBox(height: 10),
-                Text(snap.error is ApiException ? (snap.error as ApiException).message : 'Ошибка загрузки',
+                Text(snap.error is ApiException ? (snap.error as ApiException).message : loc('Ошибка загрузки', 'Жүктеу қатесі'),
                     style: const TextStyle(color: C.ink2)),
                 const SizedBox(height: 12),
-                OutlinedButton.icon(onPressed: _reload, icon: const Icon(Icons.refresh), label: const Text('Повторить')),
+                OutlinedButton.icon(onPressed: _reload, icon: const Icon(Icons.refresh), label: Text(loc('Повторить', 'Қайталау'))),
               ],
             ),
           );

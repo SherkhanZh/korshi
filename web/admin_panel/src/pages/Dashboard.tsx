@@ -15,10 +15,12 @@ import { categoryMeta } from '../lib/meta';
 import { CoverUploadModal } from '../components/CoverUploadModal';
 import { fetchStats, fetchReports } from '../lib/api';
 import { useAsync } from '../lib/useAsync';
+import { useI18n } from '../lib/i18n';
 
 export function Dashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { t } = useI18n();
   const [coverOpen, setCoverOpen] = useState(false);
   const name = (user?.split('@')[0] ?? 'Админ').replace(/^./, (c) => c.toUpperCase());
 
@@ -31,36 +33,36 @@ export function Dashboard() {
   const newReports = reports.filter((r) => r.status === 'new');
 
   const chips = [
-    { label: 'Новые заявки', value: stats?.reportsNew ?? 0, icon: FileText, tint: '#C9881C' },
-    { label: 'В работе', value: stats?.reportsInProgress ?? 0, icon: Wrench, tint: '#1E6B4F' },
-    { label: 'Объявления', value: stats?.announcements ?? 0, icon: Megaphone, tint: '#3B9BE0' },
-    { label: 'Активные опросы', value: stats?.activePolls ?? 0, icon: BarChart3, tint: '#6C63C7' },
+    { label: t('Новые заявки', 'Жаңа өтініштер'), value: stats?.reportsNew ?? 0, icon: FileText, tint: '#C9881C' },
+    { label: t('В работе', 'Жұмыста'), value: stats?.reportsInProgress ?? 0, icon: Wrench, tint: '#1E6B4F' },
+    { label: t('Объявления', 'Хабарландырулар'), value: stats?.announcements ?? 0, icon: Megaphone, tint: '#3B9BE0' },
+    { label: t('Активные опросы', 'Белсенді сауалнамалар'), value: stats?.activePolls ?? 0, icon: BarChart3, tint: '#6C63C7' },
   ];
 
   const quickActions = [
-    { label: 'Новое объявление', icon: Megaphone, onClick: () => navigate('/announcements') },
-    { label: 'Создать опрос', icon: BarChart3, onClick: () => navigate('/polls') },
-    { label: 'Жители', icon: Users, onClick: () => navigate('/residents') },
-    { label: 'Обновить обложку', icon: ImageIcon, onClick: () => setCoverOpen(true) },
+    { label: t('Новое объявление', 'Жаңа хабарландыру'), icon: Megaphone, onClick: () => navigate('/announcements') },
+    { label: t('Создать опрос', 'Сауалнама құру'), icon: BarChart3, onClick: () => navigate('/polls') },
+    { label: t('Жители', 'Тұрғындар'), icon: Users, onClick: () => navigate('/residents') },
+    { label: t('Обновить обложку', 'Мұқабаны жаңарту'), icon: ImageIcon, onClick: () => setCoverOpen(true) },
   ];
 
   const summary = [
-    { value: stats?.residents ?? 0, label: 'Жителей в районе', icon: Users },
-    { value: stats?.reportsResolved ?? 0, label: 'Заявок решено', icon: CheckCircle2 },
-    { value: stats?.reportsTotal ?? 0, label: 'Всего заявок', icon: FileText },
+    { value: stats?.residents ?? 0, label: t('Жителей в районе', 'Аудан тұрғындары'), icon: Users },
+    { value: stats?.reportsResolved ?? 0, label: t('Заявок решено', 'Шешілген өтініштер'), icon: CheckCircle2 },
+    { value: stats?.reportsTotal ?? 0, label: t('Всего заявок', 'Барлық өтініштер'), icon: FileText },
   ];
 
-  if (loading) return <div className="p-10 text-center text-ink3">Загрузка…</div>;
+  if (loading) return <div className="p-10 text-center text-ink3">{t('Загрузка…', 'Жүктелуде…')}</div>;
 
   return (
     <div>
       <div className="mb-6 flex items-end justify-between gap-4">
         <div>
-          <p className="text-ink2">Добро пожаловать,</p>
+          <p className="text-ink2">{t('Добро пожаловать,', 'Қош келдіңіз,')}</p>
           <h1 className="font-serif text-3xl font-semibold">{name}</h1>
         </div>
         <button className="btn-primary" onClick={() => setCoverOpen(true)}>
-          <ImageIcon size={16} /> Обновить обложку района
+          <ImageIcon size={16} /> {t('Обновить обложку района', 'Аудан мұқабасын жаңарту')}
         </button>
       </div>
 
@@ -84,9 +86,9 @@ export function Dashboard() {
 
       {/* New reports */}
       <div className="mb-3 mt-8 flex items-center justify-between">
-        <h2 className="text-lg font-bold">Новые заявки</h2>
+        <h2 className="text-lg font-bold">{t('Новые заявки', 'Жаңа өтініштер')}</h2>
         <button className="text-sm font-semibold text-primary" onClick={() => navigate('/reports')}>
-          Смотреть все
+          {t('Смотреть все', 'Барлығын көру')}
         </button>
       </div>
       <div className="space-y-3">
@@ -108,18 +110,18 @@ export function Dashboard() {
                 </p>
               </div>
               <button className="btn-ghost !py-2 text-xs" onClick={() => navigate('/reports')}>
-                <MessageSquare size={14} /> Открыть
+                <MessageSquare size={14} /> {t('Открыть', 'Ашу')}
               </button>
             </div>
           );
         })}
         {newReports.length === 0 && (
-          <div className="card p-8 text-center text-ink3">Новых заявок нет</div>
+          <div className="card p-8 text-center text-ink3">{t('Новых заявок нет', 'Жаңа өтініштер жоқ')}</div>
         )}
       </div>
 
       {/* Quick actions */}
-      <h2 className="mb-3 mt-8 text-lg font-bold">Быстрые действия</h2>
+      <h2 className="mb-3 mt-8 text-lg font-bold">{t('Быстрые действия', 'Жылдам әрекеттер')}</h2>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {quickActions.map((a) => (
           <button
@@ -134,7 +136,7 @@ export function Dashboard() {
       </div>
 
       {/* Summary (real numbers) */}
-      <h2 className="mb-3 mt-8 text-lg font-bold">Сводка района</h2>
+      <h2 className="mb-3 mt-8 text-lg font-bold">{t('Сводка района', 'Аудан қорытындысы')}</h2>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {summary.map((i) => (
           <div key={i.label} className="card p-5">

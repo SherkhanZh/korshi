@@ -159,6 +159,19 @@ CREATE TABLE IF NOT EXISTS device_tokens (
   platform TEXT,
   created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS notifications (
+  id TEXT PRIMARY KEY,
+  neighborhood_id TEXT NOT NULL,
+  resident_id TEXT NOT NULL,
+  type TEXT NOT NULL,           -- 'report' | 'announcement' | 'poll'
+  ref_id TEXT NOT NULL,         -- id of the report / announcement / poll
+  title TEXT NOT NULL,
+  body TEXT NOT NULL,
+  read INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_notifications_resident
+  ON notifications (resident_id, created_at);
 `);
 
 // ─── Migration: upgrade legacy single-tenant databases in place ───
@@ -208,8 +221,18 @@ export function seedEmergencyContacts(nid: string) {
   const c = db.prepare(
     'INSERT INTO contacts (id,neighborhood_id,kind,name,role,subtitle,status_line,category,badge,phone,ord) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
   );
-  c.run(`${nid}-e1`, nid, 'important', 'Экстренная служба', 'Экстренный', '24/7', null, 'safety', 'emergency', '112', 0);
-  c.run(`${nid}-e2`, nid, 'important', 'Авария газа / электр.', 'Экстренный', '24/7', null, 'lights', 'emergency', '104', 1);
+  // Important (chairman edits these later).
+  c.run(`${nid}-i1`, nid, 'important', 'Председатель КСК', 'Председатель', 'Председатель КСК', 'Обычно отвечает быстро', 'other', 'chairman', '+7 701 000 00 01', 0);
+  c.run(`${nid}-i2`, nid, 'important', 'Участковый', 'Участковый', 'Полиция района', 'Доступен', 'safety', 'police', '+7 701 000 00 02', 1);
+  c.run(`${nid}-e1`, nid, 'important', 'Экстренная служба', 'Экстренный', '24/7', null, 'safety', 'emergency', '112', 2);
+  c.run(`${nid}-e2`, nid, 'important', 'Авария газа / электр.', 'Экстренный', '24/7', null, 'lights', 'emergency', '104', 3);
+  // Services (super-admin edits these later).
+  c.run(`${nid}-s1`, nid, 'service', 'Иван П.', 'Сантехник', 'Сантехник', null, 'water', null, '+7 701 111 11 11', 0);
+  c.run(`${nid}-s2`, nid, 'service', 'Сергей К.', 'Электрик', 'Электрик', null, 'lights', null, '+7 701 222 22 22', 1);
+  c.run(`${nid}-s3`, nid, 'service', 'ЭкоВывоз', 'Вывоз мусора', 'Вывоз мусора', null, 'garbage', null, '+7 701 333 33 33', 2);
+  // Partners (super-admin edits these later).
+  c.run(`${nid}-p1`, nid, 'partner', 'GreenClean', 'Клининг и уборка территории', null, null, 'garbage', null, '+7 701 444 44 44', 0);
+  c.run(`${nid}-p2`, nid, 'partner', 'Алматы Окна', 'Установка и ремонт окон', null, null, 'roads', null, '+7 701 555 55 55', 1);
 }
 
 /** Creates a neighborhood and its admin in one transaction. Returns the new id. */

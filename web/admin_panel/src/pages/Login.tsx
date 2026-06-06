@@ -2,9 +2,11 @@ import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
 import { ApiError } from '../lib/api';
+import { useI18n } from '../lib/i18n';
 
 export function Login() {
   const { login } = useAuth();
+  const { t } = useI18n();
   const navigate = useNavigate();
   const [email, setEmail] = useState('admin@korshi.kz');
   const [password, setPassword] = useState('');
@@ -33,18 +35,18 @@ export function Login() {
           <img src="/leaf.svg" className="h-8 w-8" alt="" />
           <div className="leading-tight">
             <p className="font-serif text-2xl font-semibold">Korshi</p>
-            <p className="text-xs text-ink3">Админ-панель</p>
+            <p className="text-xs text-ink3">{t('Админ-панель', 'Әкімші панелі')}</p>
           </div>
         </div>
 
-        <h1 className="text-xl font-bold">Вход в систему</h1>
+        <h1 className="text-xl font-bold">{t('Вход в систему', 'Жүйеге кіру')}</h1>
         <p className="mt-1 text-sm text-ink2">
-          Управление районом, заявками и жителями.
+          {t('Управление районом, заявками и жителями.', 'Ауданды, өтініштер мен тұрғындарды басқару.')}
         </p>
 
         <form onSubmit={submit} className="mt-6 space-y-4">
           <div>
-            <label className="label">Эл. почта</label>
+            <label className="label">{t('Эл. почта', 'Эл. пошта')}</label>
             <input
               className="input"
               type="email"
@@ -54,7 +56,7 @@ export function Login() {
             />
           </div>
           <div>
-            <label className="label">Пароль</label>
+            <label className="label">{t('Пароль', 'Құпиясөз')}</label>
             <input
               className="input"
               type="password"
@@ -67,7 +69,7 @@ export function Login() {
             <p className="rounded-lg bg-[#FBE6E1] px-3 py-2 text-sm text-[#C0492E]">{error}</p>
           )}
           <button type="submit" className="btn-primary w-full" disabled={busy}>
-            {busy ? 'Вход…' : 'Войти'}
+            {busy ? t('Вход…', 'Кіру…') : t('Войти', 'Кіру')}
           </button>
         </form>
 

@@ -64,7 +64,10 @@ class HomeScreen extends StatelessWidget {
                         if (d.hasAnnouncement) ...[
                           _announcement(context, l, d),
                           const SizedBox(height: 20),
-                        ],
+                        ] else
+                          // Compensate the -52 lift so the first row sits inside
+                          // the sheet (not floating over the header image).
+                          const SizedBox(height: 60),
                         SectionHeader(
                             title: l.quickReport,
                             onSeeAll: () => _openReport(context)),
@@ -177,7 +180,7 @@ class HomeScreen extends StatelessWidget {
               _circleIcon(Icons.person_rounded,
                   onTap: () => showProfileSheet(context)),
               const SizedBox(width: 8),
-              _circleIcon(Icons.notifications_none_rounded, onTap: () {}),
+              _bell(context),
             ],
           ),
         ),
@@ -218,6 +221,40 @@ class HomeScreen extends StatelessWidget {
         ),
         child: Icon(icon, color: Colors.white, size: 22),
       ),
+    );
+  }
+
+  /// Notification bell with a red dot when there are unread notifications.
+  Widget _bell(BuildContext context) {
+    return ValueListenableBuilder<int>(
+      valueListenable: unreadNotifications,
+      builder: (context, count, _) {
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            _circleIcon(
+              Icons.notifications_none_rounded,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+              ),
+            ),
+            if (count > 0)
+              Positioned(
+                right: 1,
+                top: 1,
+                child: Container(
+                  width: 11,
+                  height: 11,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD64A3A),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 1.5),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 

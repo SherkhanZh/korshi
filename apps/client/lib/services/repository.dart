@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../app_state.dart';
 import '../models/models.dart';
 import 'api_client.dart';
 import 'session.dart';
@@ -13,8 +14,9 @@ class Repository {
   // ── auth ──
 
   /// Logs the resident in with their phone + invite code (or password) and
-  /// stores the JWT in the session on success.
-  Future<void> residentLogin({required String phone, required String secret}) async {
+  /// stores the JWT in the session. Returns whether they already have a
+  /// personal password set (so onboarding can skip the "set password" step).
+  Future<bool> residentLogin({required String phone, required String secret}) async {
     final res = (await _api.postJson('/auth/resident/login', {
       'phone': phone,
       'secret': secret,
@@ -30,6 +32,7 @@ class Repository {
       nbhd: nbhd?['name'] as String?,
       address: resident?['address'] as String?,
     );
+    return res['hasPassword'] as bool? ?? false;
   }
 
   /// Sets a personal password for the logged-in resident.
@@ -92,6 +95,29 @@ class Repository {
 
   Future<ReportDetail> reportDetail(String id) async => ReportDetail.fromJson(
       (await _api.getJson('/reports/$id') as Map).cast<String, dynamic>());
+
+  /// A single announcement as an update item (used when opening one from a push).
+  Future<UpdateItem> announcementItem(String id) async => UpdateItem.fromJson(
+      (await _api.getJson('/announcements/$id') as Map).cast<String, dynamic>());
+
+  Future<NotificationsData> notifications() async => NotificationsData.fromJson(
+      (await _api.getJson('/notifications') as Map).cast<String, dynamic>());
+
+  Future<void> markNotificationsRead() async {
+    try {
+      await _api.postJson('/notifications/read', {});
+    } catch (_) {
+      // Best-effort.
+    }
+  }
+
+  /// Refreshes the global unread badge count.
+  Future<void> refreshUnread() async {
+    try {
+      final d = await notifications();
+      unreadNotifications.value = d.unread;
+    } catch (_) {}
+  }
 
   Future<void> submitReport({
     required String category,

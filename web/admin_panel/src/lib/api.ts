@@ -190,6 +190,11 @@ export async function createAnnouncement(body: {
 export async function pinAnnouncement(id: string, pinned: boolean) {
   return request(`/admin/announcements/${id}`, { method: 'PATCH', body: JSON.stringify({ pinned }) });
 }
+export async function updateAnnouncement(id: string, body: {
+  type: string; title: string; titleKk: string; message: string; messageKk: string;
+}) {
+  return request(`/admin/announcements/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+}
 export async function deleteAnnouncement(id: string) {
   return request(`/admin/announcements/${id}`, { method: 'DELETE' });
 }
@@ -283,4 +288,61 @@ export async function updateNeighborhood(
 }
 export async function deleteNeighborhood(id: string) {
   return request(`/super/neighborhoods/${id}`, { method: 'DELETE' });
+}
+
+// ── contacts ──
+export type ContactKind = 'important' | 'service' | 'partner';
+export type ContactCategory = 'water' | 'roads' | 'lights' | 'garbage' | 'safety' | 'other';
+export type ContactBadge = 'chairman' | 'police' | 'emergency' | null;
+export interface ContactRow {
+  id: string;
+  kind: ContactKind;
+  name: string;
+  role: string;
+  subtitle: string | null;
+  statusLine: string | null;
+  category: ContactCategory;
+  badge: ContactBadge;
+  phone: string;
+  ord: number;
+}
+export interface ContactInput {
+  kind?: ContactKind; // required for super create (service|partner)
+  name: string;
+  role?: string;
+  subtitle?: string;
+  category?: ContactCategory;
+  badge?: ContactBadge;
+  phone?: string;
+}
+
+// Chairman — important contacts for their own neighborhood.
+export async function fetchImportantContacts(): Promise<ContactRow[]> {
+  return request<ContactRow[]>('/admin/contacts');
+}
+export async function createImportantContact(body: ContactInput) {
+  return request<{ id: string }>('/admin/contacts', { method: 'POST', body: JSON.stringify(body) });
+}
+export async function updateImportantContact(id: string, body: Partial<ContactInput>) {
+  return request(`/admin/contacts/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+}
+export async function deleteImportantContact(id: string) {
+  return request(`/admin/contacts/${id}`, { method: 'DELETE' });
+}
+
+// Super-admin — services + partners for a chosen neighborhood.
+export async function fetchNeighborhoodContacts(nid: string): Promise<ContactRow[]> {
+  return request<ContactRow[]>(`/super/neighborhoods/${nid}/contacts`);
+}
+export async function createNeighborhoodContact(nid: string, body: ContactInput) {
+  return request<{ id: string }>(`/super/neighborhoods/${nid}/contacts`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+export async function updateNeighborhoodContact(id: string, body: Partial<ContactInput>) {
+  return request(`/super/contacts/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+}
+export async function deleteNeighborhoodContact(id: string) {
+  return request(`/super/contacts/${id}`, { method: 'DELETE' });
 }

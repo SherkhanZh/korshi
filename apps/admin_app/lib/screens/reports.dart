@@ -6,20 +6,21 @@ import '../repo.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
-const _contractors = ['Energo Service LLP', 'Water Pro KZ', 'Road Master', 'Clean City', 'Security Plus'];
+// [key, ru, kk]
 const _tabs = [
-  ['all', 'Все'],
-  ['new', 'Новые'],
-  ['inProgress', 'В работе'],
-  ['waitingCity', 'Ожидает город'],
-  ['resolved', 'Решено'],
+  ['all', 'Все', 'Барлығы'],
+  ['new', 'Новые', 'Жаңа'],
+  ['inProgress', 'В работе', 'Жұмыста'],
+  ['waitingCity', 'Ожидает город', 'Қаланы күтуде'],
+  ['resolved', 'Решено', 'Шешілді'],
 ];
+// [ru-label (stored in history), status, kk-label]
 const _quickUpdates = [
-  ['Осмотрено', 'inProgress'],
-  ['Ремонт запланирован', 'inProgress'],
-  ['Ожидает город', 'waitingCity'],
-  ['Назначен подрядчик', 'inProgress'],
-  ['Решено', 'resolved'],
+  ['Осмотрено', 'inProgress', 'Қаралды'],
+  ['Ремонт запланирован', 'inProgress', 'Жөндеу жоспарланды'],
+  ['Ожидает город', 'waitingCity', 'Қаланы күтуде'],
+  ['Назначен подрядчик', 'inProgress', 'Мердігер тағайындалды'],
+  ['Решено', 'resolved', 'Шешілді'],
 ];
 
 class ReportsScreen extends StatefulWidget {
@@ -38,7 +39,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Header(title: 'Заявки', subtitle: 'Обращения жителей района'),
+          Header(title: loc('Заявки', 'Өтініштер'), subtitle: loc('Обращения жителей района', 'Аудан тұрғындарының өтініштері')),
           Expanded(
             child: Loader<List<AdminReport>>(
               load: repo.reports,
@@ -61,7 +62,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         children: [
                           for (final t in _tabs) ...[
-                            _chip(t[1], '${counts[t[0]] ?? 0}', _tab == t[0], () => setState(() => _tab = t[0])),
+                            _chip(loc(t[1], t[2]), '${counts[t[0]] ?? 0}', _tab == t[0], () => setState(() => _tab = t[0])),
                             const SizedBox(width: 8),
                           ],
                         ],
@@ -74,9 +75,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         physics: const AlwaysScrollableScrollPhysics(),
                         children: [
                           if (items.isEmpty)
-                            const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 40),
-                              child: Center(child: Text('Заявок нет', style: TextStyle(color: C.ink3))),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 40),
+                              child: Center(child: Text(loc('Заявок нет', 'Өтініштер жоқ'), style: const TextStyle(color: C.ink3))),
                             ),
                           for (final r in items) ...[
                             _card(context, r, reload),
@@ -187,7 +188,8 @@ class _ReportDetailSheetState extends State<_ReportDetailSheet> {
   final _reply = TextEditingController();
   final _note = TextEditingController();
   bool _busy = false;
-  bool _assigning = false;
+  // A quick-status selected but not yet confirmed: [label, status].
+  List<String>? _staged;
 
   @override
   void initState() {
@@ -273,21 +275,21 @@ class _ReportDetailSheetState extends State<_ReportDetailSheet> {
                   width: double.infinity,
                   errorBuilder: (_, __, ___) => Container(
                     height: 80, alignment: Alignment.center, color: C.muted,
-                    child: const Text('Не удалось загрузить фото', style: TextStyle(color: C.ink3)),
+                    child: Text(loc('Не удалось загрузить фото', 'Фотоны жүктеу мүмкін болмады'), style: const TextStyle(color: C.ink3)),
                   ),
                 ),
               ),
             ],
 
             const SizedBox(height: 18),
-            const Text('Сообщение жителю', style: TextStyle(fontWeight: FontWeight.w700)),
+            Text(loc('Сообщение жителю', 'Тұрғынға хабарлама'), style: const TextStyle(fontWeight: FontWeight.w700)),
             const SizedBox(height: 8),
             TextField(
               controller: _reply,
               minLines: 2,
               maxLines: 4,
               onChanged: (_) => setState(() {}),
-              decoration: const InputDecoration(hintText: 'Ответ появится в истории заявки у жителя…'),
+              decoration: InputDecoration(hintText: loc('Ответ появится в истории заявки у жителя…', 'Жауап тұрғынның өтініш тарихында көрінеді…')),
             ),
             const SizedBox(height: 8),
             Align(
@@ -302,84 +304,68 @@ class _ReportDetailSheetState extends State<_ReportDetailSheet> {
                       },
                 style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
                 icon: const Icon(Icons.send_rounded, size: 18),
-                label: const Text('Отправить'),
+                label: Text(loc('Отправить', 'Жіберу')),
               ),
             ),
 
             const SizedBox(height: 18),
-            const Text('Сменить статус', style: TextStyle(fontWeight: FontWeight.w700)),
+            Text(loc('Выберите новый статус', 'Жаңа статусты таңдаңыз'), style: const TextStyle(fontWeight: FontWeight.w700)),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
                 for (final u in _quickUpdates)
-                  OutlinedButton(
-                    onPressed: _busy
-                        ? null
-                        : () => _run(() async {
-                              await repo.patchReport(r.id, status: u[1]);
-                              return repo.addReportUpdate(r.id, u[0]);
-                            }),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: C.ink2,
-                      side: const BorderSide(color: C.border),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-                    ),
-                    child: Text(u[0]),
-                  ),
+                  Builder(builder: (_) {
+                    final active = _staged != null && _staged![0] == u[0];
+                    return OutlinedButton(
+                      onPressed: _busy ? null : () => setState(() => _staged = active ? null : u),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: active ? C.primary : C.ink2,
+                        backgroundColor: active ? C.greenTint : null,
+                        side: BorderSide(color: active ? C.primary : C.border),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                      ),
+                      child: Text(loc(u[0], u[2])),
+                    );
+                  }),
               ],
             ),
-
-            const SizedBox(height: 18),
-            OutlinedButton.icon(
-              onPressed: () => setState(() => _assigning = !_assigning),
-              icon: const Icon(Icons.engineering_rounded, size: 18),
-              label: Text(r.contractor != null ? 'Сменить подрядчика' : 'Назначить подрядчика'),
-            ),
-            if (r.contractor != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: Text('Подрядчик: ${r.contractor}', style: const TextStyle(color: C.ink2)),
-              ),
-            if (_assigning) ...[
+            if (_staged != null) ...[
               const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final c in _contractors)
-                    ActionChip(
-                      label: Text(c),
-                      onPressed: _busy
-                          ? null
-                          : () async {
-                              setState(() => _assigning = false);
-                              await _run(() async {
-                                await repo.patchReport(r.id, contractor: c);
-                                return repo.addReportUpdate(r.id, 'Назначен подрядчик: $c');
-                              });
-                            },
-                    ),
-                ],
-              ),
+              Text(loc('Изменение применится после нажатия «Подтвердить».', '«Растау» батырмасын басқаннан кейін өзгеріс қолданылады.'),
+                  style: const TextStyle(color: C.ink3, fontSize: 12)),
             ],
+            const SizedBox(height: 10),
+            FilledButton.icon(
+              onPressed: _busy || _staged == null
+                  ? null
+                  : () => _run(() async {
+                        final u = _staged!;
+                        await repo.patchReport(r.id, status: u[1]);
+                        final res = await repo.addReportUpdate(r.id, u[0]);
+                        if (mounted) setState(() => _staged = null);
+                        return res;
+                      }),
+              icon: const Icon(Icons.check_rounded, size: 18),
+              label: Text(loc('Подтвердить', 'Растау')),
+            ),
 
             const SizedBox(height: 18),
-            const Text('Внутренняя заметка (только для администрации)', style: TextStyle(fontWeight: FontWeight.w700)),
+            Text(loc('Внутренняя заметка (только для администрации)', 'Ішкі ескертпе (тек әкімшілікке)'), style: const TextStyle(fontWeight: FontWeight.w700)),
             const SizedBox(height: 8),
             TextField(
               controller: _note,
               minLines: 2,
               maxLines: 4,
               onEditingComplete: () => _run(() => repo.patchReport(r.id, internalNote: _note.text)),
-              decoration: const InputDecoration(hintText: 'Например: ждём доступности подрядчика…'),
+              decoration: InputDecoration(hintText: loc('Например: ждём доступности подрядчика…', 'Мысалы: мердігердің босауын күтудеміз…')),
             ),
 
             const SizedBox(height: 8),
             if (r.updates.isNotEmpty) ...[
               const SizedBox(height: 10),
-              const Text('История', style: TextStyle(fontWeight: FontWeight.w700)),
+              Text(loc('История', 'Тарих'), style: const TextStyle(fontWeight: FontWeight.w700)),
               const SizedBox(height: 8),
               for (final u in r.updates)
                 Padding(
@@ -406,7 +392,7 @@ class _ReportDetailSheetState extends State<_ReportDetailSheet> {
                         return repo.addReportUpdate(r.id, 'Заявка решена');
                       }),
               icon: const Icon(Icons.check_circle_rounded, size: 18),
-              label: const Text('Отметить решённой'),
+              label: Text(loc('Отметить решённой', 'Шешілді деп белгілеу')),
             ),
           ],
         ),
