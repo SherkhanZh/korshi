@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "1058982794785",
+    "project_id": "korshi-4bfe4",
+    "storage_bucket": "korshi-4bfe4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1058982794785:android:30f9853f87db6122da3560",
+        "android_client_info": {
+          "package_name": "com.sherkhanzhantali.korshi_admin"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCj4PYBmJxRb9sgEXmHAkmlF-RViX96ZJU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1058982794785:android:aad60c1fe7c13b7fda3560",
+        "android_client_info": {
+          "package_name": "com.sherkhanzhantali.ksk"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCj4PYBmJxRb9sgEXmHAkmlF-RViX96ZJU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

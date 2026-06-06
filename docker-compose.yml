@@ -12,6 +12,10 @@ services:
       - PORT=3000
       # Change this in production to secure issued JWTs.
       - JWT_SECRET=${JWT_SECRET:-korshi-prod-change-me}
+      # Push notifications (optional). Put the Firebase service-account JSON in a
+      # .env file next to this compose file as FIREBASE_SERVICE_ACCOUNT='{...}'.
+      # Leave empty to disable push (the API runs fine without it).
+      - FIREBASE_SERVICE_ACCOUNT=${FIREBASE_SERVICE_ACCOUNT:-}
     expose:
       - "3000"
     volumes:

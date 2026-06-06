@@ -5,12 +5,15 @@ import 'app_state.dart';
 import 'l10n/app_localizations.dart';
 import 'screens/main_shell.dart';
 import 'screens/onboarding/onboarding.dart';
+import 'services/push.dart';
 import 'services/session.dart';
 import 'theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await loadSession();
+  await PushService.init();
+  if (isLoggedIn) PushService.registerIfPossible();
   runApp(const KorshiApp());
 }
 

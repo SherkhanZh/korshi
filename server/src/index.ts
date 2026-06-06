@@ -5,7 +5,9 @@ import bcrypt from 'bcryptjs';
 import path from 'path';
 import fs from 'fs';
 import { db, seed, neighborhoodName, createNeighborhood } from './db';
-import { signToken, requireAdmin, requireSuper, requireResident, type AuthedRequest } from './auth';
+import jwt from 'jsonwebtoken';
+import { signToken, requireAdmin, requireSuper, requireResident, requireUser, type AuthedRequest, type TokenPayload } from './auth';
+import { sendToTokens, type PushMessage } from './push';
 
 seed();
 
@@ -13,6 +15,13 @@ const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 app.use(cors());
 app.use(express.json());
+
+// Uploaded files (cover images + report photos) live here.
+const uploadsDir = path.join(process.cwd(), 'data', 'uploads');
+fs.mkdirSync(uploadsDir, { recursive: true });
+
+// Report photos are received in memory, then written with the new report id.
+const reportUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 12 * 1024 * 1024 } });
 
 const q = (sql: string) => db.prepare(sql);
 const digits = (s: string) => (s || '').replace(/\D/g, '');
@@ -43,6 +52,7 @@ function reportRow(r: any) {
     chairmanNote: last ? last.body : 'Заявка получена.',
     updatedLabel: last ? `Обновлено: ${last.date}` : 'Обновлено недавно',
     steps: JSON.parse(r.steps_json || '[]'),
+    hasPhoto: !!r.photo,
   };
 }
 function reportDetail(r: any) {
@@ -78,9 +88,49 @@ function pollVoters(pollId: string) {
   ).all(pollId) as any[]).map((x) => ({ name: x.name && x.name !== '—' ? x.name : 'Житель', optionId: x.optionId }));
 }
 
+// ───────────────────────── push notifications ─────────────────────────
+function tokensWhere(sql: string, ...params: unknown[]): string[] {
+  return (q(`SELECT token FROM device_tokens WHERE ${sql}`).all(...params) as any[]).map((r) => r.token);
+}
+function pruneTokens(dead: string[]) {
+  if (!dead.length) return;
+  const del = q('DELETE FROM device_tokens WHERE token=?');
+  for (const t of dead) del.run(t);
+}
+/** Fire-and-forget push to a set of tokens; prunes dead tokens afterwards. */
+function notify(tokens: string[], msg: PushMessage) {
+  if (tokens.length === 0) return;
+  sendToTokens(tokens, msg).then(pruneTokens).catch((e) => console.warn('[push] notify error', e?.message));
+}
+const notifyResident = (residentId: string, msg: PushMessage) =>
+  notify(tokensWhere("user_type='resident' AND user_id=?", residentId), msg);
+const notifyNeighborhoodResidents = (nid: string, msg: PushMessage) =>
+  notify(tokensWhere("user_type='resident' AND neighborhood_id=?", nid), msg);
+const notifyNeighborhoodAdmins = (nid: string, msg: PushMessage) =>
+  notify(tokensWhere("user_type='admin' AND neighborhood_id=?", nid), msg);
+
+app.post('/api/push/register', requireUser, (req: AuthedRequest, res) => {
+  const token = String(req.body?.token || '').trim();
+  if (!token) return res.status(400).json({ error: 'token required' });
+  const role = req.auth!.role; // 'resident' | 'admin'
+  q(`INSERT INTO device_tokens (token,user_type,user_id,neighborhood_id,app,platform,created_at)
+     VALUES (?,?,?,?,?,?,?)
+     ON CONFLICT(token) DO UPDATE SET user_type=excluded.user_type, user_id=excluded.user_id,
+       neighborhood_id=excluded.neighborhood_id, app=excluded.app, platform=excluded.platform`).run(
+    token, role, req.auth!.sub, req.auth!.nid!, role === 'admin' ? 'admin' : 'client',
+    String(req.body?.platform || ''), new Date().toISOString());
+  res.json({ ok: true });
+});
+
+app.post('/api/push/unregister', requireUser, (req: AuthedRequest, res) => {
+  const token = String(req.body?.token || '').trim();
+  if (token) q('DELETE FROM device_tokens WHERE token=?').run(token);
+  res.json({ ok: true });
+});
+
 // ───────────────────────── health ─────────────────────────
 app.get('/api/health', (_req, res) =>
-  res.json({ status: 'ok', service: 'korshi-server', version: '0.3.0', time: new Date().toISOString() }));
+  res.json({ status: 'ok', service: 'korshi-server', version: '0.4.0', time: new Date().toISOString() }));
 
 // ───────────────────────── auth ─────────────────────────
 app.post('/api/auth/admin/login', (req, res) => {
@@ -328,7 +378,7 @@ app.get('/api/reports/:id', requireResident, (req: AuthedRequest, res) => {
   res.json(reportDetail(r));
 });
 
-app.post('/api/reports', requireResident, (req: AuthedRequest, res) => {
+app.post('/api/reports', requireResident, reportUpload.single('image'), (req: AuthedRequest, res) => {
   const { category, description, location } = req.body ?? {};
   if (!category) return res.status(400).json({ error: 'category required' });
   const resident = q('SELECT name FROM residents WHERE id=?').get(req.auth!.sub) as any;
@@ -338,9 +388,17 @@ app.post('/api/reports', requireResident, (req: AuthedRequest, res) => {
   };
   const desc = String(description || '').trim();
   const id = `c${nowMs()}`;
-  q(`INSERT INTO reports (id,neighborhood_id,resident_id,author,title,category,status,location,date_time,description,steps_json,detail_steps_json,updates_json,created_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
-    id, req.auth!.nid!, req.auth!.sub, resident?.name || '', desc || titles[category] || 'Обращение', category, 'waitingResponse',
+  const reportTitle = desc || titles[category] || 'Обращение';
+  // Persist an attached photo (if any) as report_<id>.<ext>.
+  let photo: string | null = null;
+  if (req.file) {
+    const ext = path.extname(req.file.originalname || '').toLowerCase() || '.jpg';
+    photo = `report_${id}${ext}`;
+    fs.writeFileSync(path.join(uploadsDir, photo), new Uint8Array(req.file.buffer));
+  }
+  q(`INSERT INTO reports (id,neighborhood_id,resident_id,author,title,category,status,location,date_time,description,steps_json,detail_steps_json,updates_json,photo,created_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+    id, req.auth!.nid!, req.auth!.sub, resident?.name || '', reportTitle, category, 'waitingResponse',
     location || '', new Date().toLocaleString('ru-RU'), desc,
     JSON.stringify([
       { label: 'Отправлено', date: 'сейчас', state: 'done' },
@@ -353,9 +411,38 @@ app.post('/api/reports', requireResident, (req: AuthedRequest, res) => {
       { label: 'Решено', date: null, state: 'pending' },
     ]),
     JSON.stringify([{ date: 'сейчас', body: 'Заявка получена. Ожидает рассмотрения председателем.' }]),
+    photo,
     String(nowMs()),
   );
+  // Notify the neighborhood's chairman(s) of the new report.
+  notifyNeighborhoodAdmins(req.auth!.nid!, {
+    title: 'Новая заявка',
+    body: `${reportTitle}${location ? ' · ' + location : ''}`,
+    data: { type: 'report', id },
+  });
   res.status(201).json(reportDetail(q('SELECT * FROM reports WHERE id=?').get(id)));
+});
+
+// Report photo — token via Authorization header or ?token= (so <img> can load it).
+// Resident sees their own report's photo; neighborhood admin sees any in their area.
+app.get('/api/reports/:id/photo', (req, res) => {
+  const h = req.headers.authorization || '';
+  const raw = h.startsWith('Bearer ') ? h.slice(7) : String(req.query.token || '');
+  let payload: TokenPayload | null = null;
+  try {
+    payload = jwt.verify(raw, process.env.JWT_SECRET || 'korshi-dev-secret-change-me') as TokenPayload;
+  } catch {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  const r = q('SELECT * FROM reports WHERE id=?').get(req.params.id) as any;
+  if (!r || !r.photo) return res.status(404).json({ error: 'no photo' });
+  const allowed =
+    (payload.role === 'resident' && r.resident_id === payload.sub) ||
+    (payload.role === 'admin' && r.neighborhood_id === payload.nid);
+  if (!allowed) return res.status(403).json({ error: 'forbidden' });
+  const p = path.join(uploadsDir, r.photo);
+  if (!fs.existsSync(p)) return res.status(404).json({ error: 'no photo' });
+  res.sendFile(p);
 });
 
 // ───────────────────────── admin: reports ─────────────────────────
@@ -375,6 +462,17 @@ app.patch('/api/admin/reports/:id', requireAdmin, (req: AuthedRequest, res) => {
   if (status) q('UPDATE reports SET status=? WHERE id=?').run(status, r.id);
   if (contractor !== undefined) q('UPDATE reports SET contractor=? WHERE id=?').run(contractor, r.id);
   if (internalNote !== undefined) q('UPDATE reports SET internal_note=? WHERE id=?').run(internalNote, r.id);
+  // Notify the resident when their report's status changes.
+  if (status && status !== r.status && r.resident_id) {
+    const labels: Record<string, string> = {
+      waitingResponse: 'Ожидает ответа', inProgress: 'В работе', waitingCity: 'Ожидает город', resolved: 'Решено',
+    };
+    notifyResident(r.resident_id, {
+      title: 'Статус заявки обновлён',
+      body: `${r.title}: ${labels[status] || status}`,
+      data: { type: 'report', id: r.id },
+    });
+  }
   res.json(reportDetail(q('SELECT * FROM reports WHERE id=?').get(r.id)));
 });
 
@@ -386,6 +484,14 @@ app.post('/api/admin/reports/:id/update', requireAdmin, (req: AuthedRequest, res
   const updates = JSON.parse(r.updates_json || '[]');
   updates.push({ date: new Date().toLocaleDateString('ru-RU'), body });
   q('UPDATE reports SET updates_json=? WHERE id=?').run(JSON.stringify(updates), r.id);
+  // Notify the resident of the chairman's message.
+  if (r.resident_id) {
+    notifyResident(r.resident_id, {
+      title: 'Сообщение от председателя',
+      body: body.length > 120 ? body.slice(0, 117) + '…' : body,
+      data: { type: 'report', id: r.id },
+    });
+  }
   res.json(reportDetail(q('SELECT * FROM reports WHERE id=?').get(r.id)));
 });
 
@@ -408,6 +514,13 @@ app.post('/api/admin/announcements', requireAdmin, (req: AuthedRequest, res) => 
     id, req.auth!.nid!, type || 'update', title, titleKk || title, message || '', messageKk || message || '',
     audience || 'all', audienceLabel || 'Весь район',
     0, publishNow === false ? 'запланировано' : 'только что', 0, String(nowMs()));
+  if (publishNow !== false) {
+    notifyNeighborhoodResidents(req.auth!.nid!, {
+      title: 'Новое объявление',
+      body: title,
+      data: { type: 'announcement', id },
+    });
+  }
   res.status(201).json({ id });
 });
 app.patch('/api/admin/announcements/:id', requireAdmin, (req: AuthedRequest, res) => {
@@ -450,6 +563,11 @@ app.post('/api/admin/polls', requireAdmin, (req: AuthedRequest, res) => {
   (options as string[]).forEach((label, i) => {
     if (!label.trim()) return;
     ins.run(id, label, (kkArr[i] || label).toString(), 0, i === 0 ? 1 : 0, i);
+  });
+  notifyNeighborhoodResidents(req.auth!.nid!, {
+    title: 'Новый опрос',
+    body: question,
+    data: { type: 'poll', id },
   });
   res.status(201).json({ id });
 });
@@ -605,8 +723,6 @@ app.delete('/api/super/neighborhoods/:id', requireSuper, (req, res) => {
 });
 
 // ───────────────────────── cover image (per neighborhood) ─────────────────────────
-const uploadsDir = path.join(process.cwd(), 'data', 'uploads');
-fs.mkdirSync(uploadsDir, { recursive: true });
 function coverFile(nid: string): string | null {
   const f = fs.readdirSync(uploadsDir).find((n) => n.startsWith(`cover_${nid}.`));
   return f ? path.join(uploadsDir, f) : null;

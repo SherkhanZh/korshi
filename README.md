@@ -25,7 +25,7 @@ ksk/
 | Path                | What it is                              | Status        |
 |---------------------|-----------------------------------------|---------------|
 | `apps/client`       | Resident Flutter app                    | ✅ Live data   |
-| `apps/admin_app`    | Chairman Flutter app                    | 🔲 Planned    |
+| `apps/admin_app`    | Chairman Flutter app                    | ✅ First cut   |
 | `web/admin_panel`   | Web admin panel (React + Vite)          | ✅ Live data   |
 | `server`            | Backend API (Node + Express + SQLite)   | ✅ Persistent  |
 | `packages/shared`   | Models, theme tokens, l10n shared by apps| 🔲 Planned    |
@@ -56,6 +56,30 @@ Auth uses JWTs (the token carries the principal's role + neighborhood). Set
 `JWT_SECRET` in production (see `docker-compose.yml`). Data persists in SQLite on
 the `korshi_data` Docker volume; existing single-tenant databases migrate
 automatically into the default neighborhood on first boot.
+
+## Push notifications (FCM)
+
+Both apps share **one** Firebase project. One APNs `.p8` key (Apple team level)
+covers both iOS apps; one backend service-account JSON covers the project.
+
+**Backend:** provide the Firebase service-account JSON to the API as the
+`FIREBASE_SERVICE_ACCOUNT` env var (a `.env` next to `docker-compose.yml` works:
+`FIREBASE_SERVICE_ACCOUNT='{...}'`). If unset, push is simply disabled — the API
+still runs. The server sends on these events:
+
+- new report → the neighborhood's chairman(s)
+- report status change / chairman message → the report's resident
+- new announcement / new poll → the neighborhood's residents
+
+Device tokens are registered via `POST /api/push/register` (on login) and removed
+via `/api/push/unregister` (on logout); the sender prunes tokens FCM reports as
+stale.
+
+**Apps:** each Flutter app needs its own Firebase app registration. Run
+`flutterfire configure` in `apps/client` and `apps/admin_app` to generate
+`firebase_options.dart` + drop in `google-services.json` / `GoogleService-Info.plist`.
+Push code is already wired and **guarded** — the apps build and run even before
+Firebase is configured (push just stays off until the config is present).
 
 ## Deployment
 

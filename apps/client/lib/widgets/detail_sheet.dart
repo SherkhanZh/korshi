@@ -2,11 +2,16 @@ import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
 import '../models/models.dart';
+import '../services/api_client.dart';
 import '../services/repository.dart';
+import '../services/session.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import 'async_view.dart';
 import 'common.dart';
+
+String? _reportPhotoUrl(ReportItem r) =>
+    r.hasPhoto ? '${ApiConfig.baseUrl}/reports/${r.id}/photo' : null;
 
 /// Opens the detail sheet for a submitted report (My reports), loading the full
 /// detail (author, history, chairman updates) by id.
@@ -26,6 +31,7 @@ void showReportSheet(BuildContext context, ReportItem report) {
           body: d.description.isEmpty ? report.chairmanNote : d.description,
           history: history,
           updates: d.chairmanUpdates,
+          photoUrl: _reportPhotoUrl(report),
         );
       },
     ),
@@ -48,6 +54,7 @@ void showReportSheetById(BuildContext context, String id) {
         body: d.description.isEmpty ? d.report.chairmanNote : d.description,
         history: d.detailSteps.isNotEmpty ? d.detailSteps : d.report.steps,
         updates: d.chairmanUpdates,
+        photoUrl: _reportPhotoUrl(d.report),
       ),
     ),
   );
@@ -121,6 +128,7 @@ class _DetailBody extends StatelessWidget {
     required this.body,
     required this.history,
     required this.updates,
+    this.photoUrl,
   });
 
   final IssueCategory category;
@@ -131,6 +139,7 @@ class _DetailBody extends StatelessWidget {
   final String body;
   final List<TimelineStep> history;
   final List<ChairmanUpdate> updates;
+  final String? photoUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -233,6 +242,31 @@ class _DetailBody extends StatelessWidget {
                 Text('Описание', style: AppTheme.cardTitle.copyWith(fontSize: 16)),
                 const SizedBox(height: 8),
                 AppCard(child: Text(body, style: AppTheme.body.copyWith(height: 1.5))),
+              ],
+              if (photoUrl != null) ...[
+                const SizedBox(height: 16),
+                Text('Фото', style: AppTheme.cardTitle.copyWith(fontSize: 16)),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: Image.network(
+                    photoUrl!,
+                    headers: authToken.value != null
+                        ? {'Authorization': 'Bearer ${authToken.value}'}
+                        : null,
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    errorBuilder: (_, __, ___) => Container(
+                      height: 80,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceMuted,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Text('Не удалось загрузить фото', style: AppTheme.subtle),
+                    ),
+                  ),
+                ),
               ],
               const SizedBox(height: 16),
               Text('История статусов', style: AppTheme.cardTitle.copyWith(fontSize: 16)),

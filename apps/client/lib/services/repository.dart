@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import '../models/models.dart';
 import 'api_client.dart';
 import 'session.dart';
@@ -40,6 +42,25 @@ class Repository {
     await _api.postJson('/polls/$pollId/vote', {'optionId': optionId});
   }
 
+  /// Registers this device's FCM token for push notifications.
+  Future<void> registerPushToken(String token) async {
+    try {
+      await _api.postJson('/push/register', {
+        'token': token,
+        'platform': defaultTargetPlatform.name,
+      });
+    } catch (_) {
+      // Best-effort; ignore failures.
+    }
+  }
+
+  /// Removes this device's FCM token (on logout).
+  Future<void> unregisterPushToken(String token) async {
+    try {
+      await _api.postJson('/push/unregister', {'token': token});
+    } catch (_) {}
+  }
+
   /// Marks an announcement as seen by the resident (for real view counts).
   Future<void> markAnnouncementSeen(String id) async {
     if (id.isEmpty) return;
@@ -76,12 +97,18 @@ class Repository {
     required String category,
     required String description,
     required String location,
+    String? photoPath,
   }) async {
-    await _api.postJson('/reports', {
+    final fields = {
       'category': category,
       'description': description,
       'location': location,
-    });
+    };
+    if (photoPath != null) {
+      await _api.postMultipart('/reports', fields, filePath: photoPath);
+    } else {
+      await _api.postJson('/reports', fields);
+    }
   }
 }
 

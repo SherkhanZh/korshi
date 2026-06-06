@@ -84,6 +84,7 @@ interface SrvReport {
   internalNote: string | null;
   chairmanUpdates: { date: string; body: string }[];
   resident?: string;
+  hasPhoto?: boolean;
 }
 
 function adaptReport(r: SrvReport): Report {
@@ -100,7 +101,7 @@ function adaptReport(r: SrvReport): Report {
     description: r.description || '',
     contractor: r.contractor || undefined,
     internalNote: r.internalNote || undefined,
-    hasPhoto: false,
+    hasPhoto: !!r.hasPhoto,
     timeline: (r.chairmanUpdates || []).map((u) => ({
       time: u.date,
       title: u.body,
@@ -149,6 +150,10 @@ export async function addReportUpdate(id: string, text: string) {
     method: 'POST',
     body: JSON.stringify({ body: text }),
   }));
+}
+/** Report photo URL (token in query so a plain <img> can load it). */
+export function reportPhotoUrl(id: string): string {
+  return `${BASE}/reports/${id}/photo?token=${getToken() ?? ''}`;
 }
 
 // ── stats ──

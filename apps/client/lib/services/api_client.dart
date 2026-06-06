@@ -86,4 +86,30 @@ class ApiClient {
     }
     _fail(res, 'POST', path);
   }
+
+  /// Multipart POST with optional file upload (e.g. a report photo).
+  Future<dynamic> postMultipart(
+    String path,
+    Map<String, String> fields, {
+    String? filePath,
+    String fileField = 'image',
+  }) async {
+    final http.Response res;
+    try {
+      final req = http.MultipartRequest('POST', _uri(path));
+      req.headers.addAll(_headers()); // Accept + Authorization (no JSON content-type)
+      req.fields.addAll(fields);
+      if (filePath != null) {
+        req.files.add(await http.MultipartFile.fromPath(fileField, filePath));
+      }
+      final streamed = await req.send().timeout(const Duration(seconds: 30));
+      res = await http.Response.fromStream(streamed);
+    } catch (_) {
+      throw ApiException('Не удалось отправить фото', statusCode: 0);
+    }
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      return res.bodyBytes.isEmpty ? null : jsonDecode(utf8.decode(res.bodyBytes));
+    }
+    _fail(res, 'POST', path);
+  }
 }

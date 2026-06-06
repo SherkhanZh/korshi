@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../services/api_client.dart';
+import '../../services/push.dart';
 import '../../services/repository.dart';
 import '../../services/session.dart';
 import '../../theme/app_colors.dart';
@@ -229,6 +230,7 @@ class _InviteCodeScreenState extends State<InviteCodeScreen> {
     setState(() => _busy = true);
     try {
       await repository.residentLogin(phone: pendingPhone ?? '', secret: secret);
+      PushService.registerIfPossible(); // register this device for push
       if (!mounted) return;
       Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => const SecureAccessScreen()),

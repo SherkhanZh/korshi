@@ -79,6 +79,7 @@ class _ReportScreenState extends State<ReportScreen> {
         category: _selected.code,
         description: _controller.text.trim(),
         location: loc.isEmpty ? '—' : loc,
+        photoPath: _photoPath,
       );
       dataVersion.value++; // refresh open lists (Home / Updates / My reports)
       messenger.showSnackBar(

@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import '../app_state.dart';
 import '../l10n/app_localizations.dart';
 import '../services/launchers.dart';
+import '../services/push.dart';
 import '../services/session.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
@@ -141,6 +142,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           danger: true,
           onTap: () async {
             final nav = Navigator.of(context);
+            await PushService.unregister();
             await clearSession();
             nav.pop(); // close the profile sheet
             nav.pushAndRemoveUntil(

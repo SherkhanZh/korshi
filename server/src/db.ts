@@ -60,6 +60,7 @@ CREATE TABLE IF NOT EXISTS reports (
   steps_json TEXT NOT NULL DEFAULT '[]',
   detail_steps_json TEXT NOT NULL DEFAULT '[]',
   updates_json TEXT NOT NULL DEFAULT '[]',
+  photo TEXT,
   created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS announcements (
@@ -149,6 +150,15 @@ CREATE TABLE IF NOT EXISTS settings (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS device_tokens (
+  token TEXT PRIMARY KEY,
+  user_type TEXT NOT NULL,      -- 'resident' | 'admin'
+  user_id TEXT NOT NULL,
+  neighborhood_id TEXT NOT NULL,
+  app TEXT NOT NULL,            -- 'client' | 'admin'
+  platform TEXT,
+  created_at TEXT NOT NULL
+);
 `);
 
 // ─── Migration: upgrade legacy single-tenant databases in place ───
@@ -179,6 +189,7 @@ function migrate() {
   ensureColumn('polls', 'description_kk', "TEXT NOT NULL DEFAULT ''");
   ensureColumn('polls', 'confidential', 'INTEGER NOT NULL DEFAULT 1');
   ensureColumn('poll_options', 'label_kk', "TEXT NOT NULL DEFAULT ''");
+  ensureColumn('reports', 'photo', 'TEXT');
   // Backfill KK = RU for pre-existing rows so the app always has a fallback.
   db.exec(`UPDATE announcements SET title_kk = title WHERE title_kk = ''`);
   db.exec(`UPDATE announcements SET message_kk = message WHERE message_kk = ''`);

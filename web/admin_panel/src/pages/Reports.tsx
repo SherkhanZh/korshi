@@ -13,7 +13,7 @@ import { Modal } from '../components/ui/Modal';
 import { contractors } from '../data/mockData';
 import { categoryMeta, reportStatusMeta } from '../lib/meta';
 import type { Category, Report, ReportStatus, ReportStage } from '../types';
-import { fetchReports, patchReport, addReportUpdate } from '../lib/api';
+import { fetchReports, patchReport, addReportUpdate, reportPhotoUrl } from '../lib/api';
 import { useAsync } from '../lib/useAsync';
 
 type TabKey = ReportStatus | 'all';
@@ -254,6 +254,15 @@ function ReportDetail({
 
       {report.description && (
         <p className="mt-3 rounded-xl bg-surface p-3 text-sm text-ink2">{report.description}</p>
+      )}
+
+      {report.hasPhoto && (
+        <img
+          src={reportPhotoUrl(report.id)}
+          alt="Фото заявки"
+          className="mt-3 max-h-72 w-full rounded-xl object-cover"
+          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+        />
       )}
 
       {/* Reply to resident — posts a visible update */}

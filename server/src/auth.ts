@@ -51,3 +51,13 @@ export function requireResident(req: AuthedRequest, res: Response, next: NextFun
   req.auth = p;
   next();
 }
+
+/** Resident OR neighborhood admin (used for device-token registration). */
+export function requireUser(req: AuthedRequest, res: Response, next: NextFunction) {
+  const p = readToken(req);
+  if (!p || (p.role !== 'resident' && p.role !== 'admin') || !p.nid) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  req.auth = p;
+  next();
+}

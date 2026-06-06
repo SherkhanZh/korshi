@@ -467,6 +467,7 @@ class ReportItem {
     required this.chairmanNote,
     required this.updatedLabel,
     this.author = '',
+    this.hasPhoto = false,
   });
 
   final String id;
@@ -479,6 +480,7 @@ class ReportItem {
   final String chairmanNote;
   final String updatedLabel;
   final String author;
+  final bool hasPhoto;
 
   factory ReportItem.fromJson(Map<String, dynamic> j) => ReportItem(
         id: j['id'] as String? ?? '',
@@ -493,6 +495,7 @@ class ReportItem {
         chairmanNote: j['chairmanNote'] as String? ?? '',
         updatedLabel: j['updatedLabel'] as String? ?? '',
         author: j['author'] as String? ?? '',
+        hasPhoto: j['hasPhoto'] as bool? ?? false,
       );
 }
 
