@@ -34,11 +34,16 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
   if (token) headers.Authorization = `Bearer ${token}`;
   if (opts.body && !(opts.body instanceof FormData)) headers['Content-Type'] = 'application/json';
 
+  // Abort hung requests so a stuck connection can't freeze a modal/spinner.
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 15000);
   let res: Response;
   try {
-    res = await fetch(`${BASE}${path}`, { ...opts, headers });
+    res = await fetch(`${BASE}${path}`, { ...opts, headers, signal: ctrl.signal });
   } catch {
-    throw new ApiError(0, 'Не удалось связаться с сервером');
+    throw new ApiError(0, ctrl.signal.aborted ? 'Превышено время ожидания сервера' : 'Не удалось связаться с сервером');
+  } finally {
+    clearTimeout(timer);
   }
   if (res.status === 401) {
     setToken(null);

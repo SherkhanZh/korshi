@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './auth';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { I18nProvider } from './lib/i18n';
 import { Layout } from './components/Layout';
 import { Login } from './pages/Login';
@@ -49,10 +50,12 @@ function Router() {
 
 export default function App() {
   return (
-    <I18nProvider>
-      <AuthProvider>
-        <Router />
-      </AuthProvider>
-    </I18nProvider>
+    <ErrorBoundary>
+      <I18nProvider>
+        <AuthProvider>
+          <Router />
+        </AuthProvider>
+      </I18nProvider>
+    </ErrorBoundary>
   );
 }
