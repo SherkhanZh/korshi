@@ -4,6 +4,7 @@ import 'api.dart';
 import 'push.dart';
 import 'screens/login.dart';
 import 'screens/shell.dart';
+import 'splash.dart';
 import 'theme.dart';
 
 Future<void> main() async {
@@ -30,11 +31,18 @@ class KorshiAdminApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         scaffoldMessengerKey: adminMessengerKey,
         theme: korshiTheme(),
-        home: ValueListenableBuilder<String?>(
-          valueListenable: adminToken,
-          builder: (context, token, _) => KeyedSubtree(
-            key: ValueKey('lang-$lang'),
-            child: token == null ? const LoginScreen() : const AdminShell(),
+        // Tap anywhere outside a text field to dismiss the keyboard.
+        builder: (context, child) => GestureDetector(
+          onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+          child: child,
+        ),
+        home: SplashGate(
+          child: ValueListenableBuilder<String?>(
+            valueListenable: adminToken,
+            builder: (context, token, _) => KeyedSubtree(
+              key: ValueKey('lang-$lang'),
+              child: token == null ? const LoginScreen() : const AdminShell(),
+            ),
           ),
         ),
       ),

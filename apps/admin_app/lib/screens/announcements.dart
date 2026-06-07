@@ -231,6 +231,7 @@ class _CreateAnnouncementSheetState extends State<_CreateAnnouncementSheet> {
         decoration: const BoxDecoration(color: C.scaffold, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
         child: ListView(
           controller: controller,
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
           children: [
             Text(_isEdit ? loc('Изменить объявление', 'Хабарландыруды өзгерту') : loc('Новое объявление', 'Жаңа хабарландыру'),

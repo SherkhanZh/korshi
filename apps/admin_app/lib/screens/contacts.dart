@@ -201,6 +201,7 @@ class _ContactSheetState extends State<_ContactSheet> {
         decoration: const BoxDecoration(color: C.scaffold, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
         child: ListView(
           controller: controller,
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
           children: [
             Text(_isEdit ? loc('Изменить контакт', 'Контактіні өзгерту') : loc('Новый контакт', 'Жаңа контакт'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),

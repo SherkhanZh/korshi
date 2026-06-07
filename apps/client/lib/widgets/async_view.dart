@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import '../theme/app_colors.dart';
 
 /// Wraps a Future with loading / error (retry) / data states.
@@ -30,6 +31,10 @@ class _AsyncViewState<T> extends State<AsyncView<T>> {
   /// content while new data loads (stale-while-revalidate) instead of blanking.
   T? _data;
 
+  /// Consecutive failures — drives a short auto-retry so a flaky first request
+  /// recovers on its own instead of stranding the user on the error screen.
+  int _fails = 0;
+
   @override
   void initState() {
     super.initState();
@@ -43,16 +48,33 @@ class _AsyncViewState<T> extends State<AsyncView<T>> {
     super.dispose();
   }
 
-  /// Remembers the resolved value of [f] for stale-while-revalidate.
+  /// Remembers the resolved value of [f] for stale-while-revalidate, and
+  /// auto-retries a few times on failure.
   Future<T> _track(Future<T> f) {
     f.then((v) {
+      _fails = 0;
       if (mounted) setState(() => _data = v);
-    }).catchError((_) {});
+    }).catchError((_) {
+      if (mounted && _fails < 3) {
+        _fails++;
+        Future<void>.delayed(const Duration(milliseconds: 1200), _retry);
+      }
+    });
     return f;
   }
 
   void _retry() {
-    if (mounted) setState(() => _future = _track(widget.create()));
+    if (!mounted) return;
+    // If a refresh fires while the framework is mid-build/layout (e.g. on
+    // app-resume), defer the setState to the next frame to avoid the
+    // "setState() called during build" crash.
+    if (SchedulerBinding.instance.schedulerPhase == SchedulerPhase.persistentCallbacks) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() { _future = _track(widget.create()); });
+      });
+    } else {
+      setState(() { _future = _track(widget.create()); });
+    }
   }
 
   @override

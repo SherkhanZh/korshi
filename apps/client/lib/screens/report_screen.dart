@@ -103,6 +103,7 @@ class _ReportScreenState extends State<ReportScreen> {
           children: [
             Expanded(
               child: ListView(
+                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
                 children: [
                   _topBar(context, l),

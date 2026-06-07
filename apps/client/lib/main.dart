@@ -7,6 +7,7 @@ import 'screens/main_shell.dart';
 import 'screens/onboarding/onboarding.dart';
 import 'services/push.dart';
 import 'services/session.dart';
+import 'splash.dart';
 import 'theme/app_theme.dart';
 
 Future<void> main() async {
@@ -63,7 +64,12 @@ class _KorshiAppState extends State<KorshiApp> with WidgetsBindingObserver {
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
           ],
-          home: isLoggedIn ? const MainShell() : const WelcomeScreen(),
+          // Tap anywhere outside a text field to dismiss the keyboard.
+          builder: (context, child) => GestureDetector(
+            onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+            child: child,
+          ),
+          home: SplashGate(child: isLoggedIn ? const MainShell() : const WelcomeScreen()),
         );
       },
     );

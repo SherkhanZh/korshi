@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 import 'api.dart';
 import 'theme.dart';
@@ -15,10 +16,12 @@ class Loader<T> extends StatefulWidget {
 
 class _LoaderState<T> extends State<Loader<T>> {
   late Future<T> _future;
+  int _fails = 0; // consecutive failures → short auto-retry
+
   @override
   void initState() {
     super.initState();
-    _future = widget.load();
+    _future = _track(widget.load());
     widget.refresh?.addListener(_reload);
   }
 
@@ -28,8 +31,27 @@ class _LoaderState<T> extends State<Loader<T>> {
     super.dispose();
   }
 
+  Future<T> _track(Future<T> f) {
+    f.then((_) => _fails = 0).catchError((_) {
+      if (mounted && _fails < 3) {
+        _fails++;
+        Future<void>.delayed(const Duration(milliseconds: 1200), _reload);
+      }
+    });
+    return f;
+  }
+
   void _reload() {
-    if (mounted) setState(() => _future = widget.load());
+    if (!mounted) return;
+    // Defer if a refresh fires mid-build (e.g. on app-resume) to avoid the
+    // "setState() called during build" crash.
+    if (SchedulerBinding.instance.schedulerPhase == SchedulerPhase.persistentCallbacks) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() { _future = _track(widget.load()); });
+      });
+    } else {
+      setState(() { _future = _track(widget.load()); });
+    }
   }
 
   @override

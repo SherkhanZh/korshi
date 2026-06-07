@@ -205,6 +205,7 @@ class _CreatePollSheetState extends State<_CreatePollSheet> {
         decoration: const BoxDecoration(color: C.scaffold, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
         child: ListView(
           controller: controller,
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
           children: [
             Text(loc('Создать опрос', 'Сауалнама құру'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),

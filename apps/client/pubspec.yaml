@@ -25,22 +25,33 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^4.0.0
   flutter_launcher_icons: ^0.13.1
+  flutter_native_splash: ^2.4.1
 
 flutter:
   uses-material-design: true
   assets:
     - assets/login.png
+    - assets/splash_client.png
+
+# Native launch screen (shown the instant before Flutter boots).
+# Generate with:  dart run flutter_native_splash:create
+flutter_native_splash:
+  color: "#17452F"
+  background_image: "assets/splash_client.png"
+  fullscreen: true
+  android_12:
+    color: "#17452F"
 
 # App launcher icon. Generate with:  dart run flutter_launcher_icons
 # Adaptive icon (Android 8+) avoids the white "border" tile around legacy icons.
 flutter_launcher_icons:
-  image_path: "assets/v1app_icon.png"
+  image_path: "assets/app_icon.png"
   android: true
   ios: true
   remove_alpha_ios: true
   min_sdk_android: 21
-  adaptive_icon_background: "#1E6B4F"
-  adaptive_icon_foreground: "assets/v1app_icon_fg.png"
+  adaptive_icon_background: "#17452F"
+  adaptive_icon_foreground: "assets/app_icon_fg.png"
   web:
     generate: true
-    image_path: "assets/v1app_icon.png"
+    image_path: "assets/app_icon.png"

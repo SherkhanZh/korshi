@@ -177,6 +177,7 @@ class _InviteSheetState extends State<_InviteSheet> {
         decoration: const BoxDecoration(color: C.scaffold, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
         child: ListView(
           controller: controller,
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
           children: [
             Text(loc('Пригласить жителя', 'Тұрғынды шақыру'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
