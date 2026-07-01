@@ -64,7 +64,7 @@ class ResidentsScreen extends StatelessWidget {
                     Text('${loc('Жители', 'Тұрғындар')} (${d.residents.length})', style: const TextStyle(fontWeight: FontWeight.w700)),
                     const SizedBox(height: 8),
                     for (final r in d.residents) ...[
-                      _residentTile(r),
+                      _residentTile(context, r, reload),
                       const SizedBox(height: 8),
                     ],
                   ],
@@ -77,7 +77,7 @@ class ResidentsScreen extends StatelessWidget {
     );
   }
 
-  Widget _residentTile(AdminResident r) {
+  Widget _residentTile(BuildContext context, AdminResident r, VoidCallback reload) {
     return Panel(
       padding: const EdgeInsets.all(12),
       child: Row(
@@ -101,9 +101,47 @@ class ResidentsScreen extends StatelessWidget {
             )
           else
             _statusBadge(r.status),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert_rounded, color: C.ink3, size: 20),
+            onSelected: (_) => _deleteResident(context, r, reload),
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: 'delete',
+                child: Text(
+                  r.status == 'active'
+                      ? loc('Удалить жителя', 'Тұрғынды жою')
+                      : loc('Удалить приглашение', 'Шақыруды жою'),
+                  style: const TextStyle(color: C.danger),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
+  }
+
+  Future<void> _deleteResident(BuildContext context, AdminResident r, VoidCallback reload) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        content: Text(r.status == 'active'
+            ? loc('Удалить жителя? Он потеряет доступ к приложению.', 'Тұрғынды жою керек пе? Ол қосымшаға қол жеткізе алмайды.')
+            : loc('Удалить приглашение?', 'Шақыруды жою керек пе?')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(loc('Отмена', 'Болдырмау'))),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(loc('Удалить', 'Жою'), style: const TextStyle(color: C.danger))),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await repo.deleteResident(r.id);
+      reload();
+    } on ApiException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    }
   }
 
   Widget _statusBadge(String s) {

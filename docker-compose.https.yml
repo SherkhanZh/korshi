@@ -1,0 +1,53 @@
+# Korshi — HTTPS stack (Caddy terminates TLS with automatic Let's Encrypt).
+#
+# Prerequisites:
+#   1. A domain whose DNS A record points at this server's IP.
+#   2. In the .env next to this file:  DOMAIN=your.domain
+#   3. Ports 80 and 443 open to the internet.
+#
+# Bring up:  docker compose -f docker-compose.https.yml up -d --build
+#
+# Same services as docker-compose.yml, except nginx (web) is internal and Caddy
+# fronts it on 80/443. Shares the same named volume so the database is preserved.
+services:
+  api:
+    build: ./server
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - TZ=Asia/Almaty
+      - JWT_SECRET=${JWT_SECRET:-korshi-prod-change-me}
+      - FIREBASE_SERVICE_ACCOUNT=${FIREBASE_SERVICE_ACCOUNT:-}
+    expose:
+      - "3000"
+    volumes:
+      - korshi_data:/app/data
+
+  web:
+    build: ./web/admin_panel
+    restart: unless-stopped
+    depends_on:
+      - api
+    expose:
+      - "80"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - web
+    environment:
+      - DOMAIN=${DOMAIN:?set DOMAIN=your.domain in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  korshi_data:
+  caddy_data:
+  caddy_config:

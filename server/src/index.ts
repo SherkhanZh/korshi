@@ -28,6 +28,26 @@ const digits = (s: string) => (s || '').replace(/\D/g, '');
 const last10 = (s: string) => digits(s).slice(-10);
 const nowMs = () => Date.now();
 
+// ── In-memory rate limiting (single-process server) ──
+const _rl = new Map<string, { count: number; reset: number }>();
+/** Increments the counter for [key] within [windowMs]; returns the new count. */
+function rlBump(key: string, windowMs: number): number {
+  const now = nowMs();
+  const b = _rl.get(key);
+  if (!b || now > b.reset) { _rl.set(key, { count: 1, reset: now + windowMs }); return 1; }
+  b.count++;
+  return b.count;
+}
+function rlPeek(key: string): number {
+  const b = _rl.get(key);
+  return b && nowMs() <= b.reset ? b.count : 0;
+}
+function rlClear(key: string): void { _rl.delete(key); }
+function clientIp(req: any): string {
+  const fwd = (req.headers?.['x-forwarded-for'] as string | undefined)?.split(',')[0];
+  return (fwd || req.socket?.remoteAddress || 'unknown').trim();
+}
+
 // All human-readable timestamps are rendered in the neighborhood's timezone.
 const TZ = process.env.TZ || 'Asia/Almaty';
 function nowDateTime(): string {
@@ -173,11 +193,17 @@ app.get('/api/health', (_req, res) =>
 
 // ───────────────────────── auth ─────────────────────────
 app.post('/api/auth/admin/login', (req, res) => {
+  const ip = clientIp(req);
+  if (rlPeek(`adminlogin:${ip}`) > 15) {
+    return res.status(429).json({ error: 'Слишком много попыток. Попробуйте позже.' });
+  }
   const { email, password } = req.body ?? {};
   const a = q('SELECT * FROM admins WHERE email=?').get(String(email || '').toLowerCase()) as any;
   if (!a || !bcrypt.compareSync(String(password || ''), a.password_hash)) {
+    rlBump(`adminlogin:${ip}`, 15 * 60 * 1000);
     return res.status(401).json({ error: 'Неверный email или пароль' });
   }
+  rlClear(`adminlogin:${ip}`);
   res.json({
     token: signToken({ sub: String(a.id), role: a.role, nid: a.neighborhood_id || undefined }),
     email: a.email,
@@ -189,18 +215,33 @@ app.post('/api/auth/admin/login', (req, res) => {
 });
 
 app.post('/api/auth/resident/login', (req, res) => {
+  // Brute-force protection: cap failed attempts per IP and per phone.
+  const ip = clientIp(req);
+  const phoneKey = last10(String(req.body?.phone ?? ''));
+  if (rlPeek(`login:ip:${ip}`) > 20 || rlPeek(`login:ph:${phoneKey}`) > 8) {
+    return res.status(429).json({ error: 'Слишком много попыток. Попробуйте позже.' });
+  }
+  const fail = (status: number, error: string) => {
+    rlBump(`login:ip:${ip}`, 15 * 60 * 1000);
+    rlBump(`login:ph:${phoneKey}`, 15 * 60 * 1000);
+    return res.status(status).json({ error });
+  };
+
   const phone = String(req.body?.phone ?? '');
   const secret = String(req.body?.secret ?? '').trim();
   if (!phone || !secret) return res.status(400).json({ error: 'phone and secret required' });
   const key = last10(phone);
   const all = q('SELECT * FROM residents').all() as any[];
   const r = all.find((x) => last10(x.phone) === key);
-  if (!r) return res.status(404).json({ error: 'Житель не найден. Обратитесь к председателю.' });
+  if (!r) return fail(404, 'Житель не найден. Обратитесь к председателю.');
 
   let ok = false;
   if (r.password_hash) ok = bcrypt.compareSync(secret, r.password_hash);
   if (!ok && r.invite_code) ok = secret.toUpperCase() === String(r.invite_code).toUpperCase();
-  if (!ok) return res.status(401).json({ error: 'Неверный код или пароль' });
+  if (!ok) return fail(401, 'Неверный код или пароль');
+
+  rlClear(`login:ip:${ip}`);
+  rlClear(`login:ph:${phoneKey}`);
 
   if (r.status === 'invited' || r.status === 'notJoined') {
     q("UPDATE residents SET status='active' WHERE id=?").run(r.id);
@@ -553,6 +594,10 @@ app.post('/api/notifications/read', requireResident, (req: AuthedRequest, res) =
 });
 
 app.post('/api/reports', requireResident, reportUpload.single('image'), (req: AuthedRequest, res) => {
+  // Anti-spam: cap how many reports one resident can file per window.
+  if (rlBump(`report:${req.auth!.sub}`, 10 * 60 * 1000) > 5) {
+    return res.status(429).json({ error: 'Слишком много заявок подряд. Подождите немного.' });
+  }
   const { category, description, location } = req.body ?? {};
   if (!category) return res.status(400).json({ error: 'category required' });
   const resident = q('SELECT name FROM residents WHERE id=?').get(req.auth!.sub) as any;
@@ -662,6 +707,18 @@ app.patch('/api/admin/reports/:id', requireAdmin, (req: AuthedRequest, res) => {
     });
   }
   res.json(reportDetail(q('SELECT * FROM reports WHERE id=?').get(r.id)));
+});
+
+// Delete a report (e.g. spam) — neighborhood-scoped, removes its photo too.
+app.delete('/api/admin/reports/:id', requireAdmin, (req: AuthedRequest, res) => {
+  const r = adminReport(req.params.id, req.auth!.nid!);
+  if (!r) return res.status(404).json({ error: 'not found' });
+  if (r.photo) {
+    try { fs.unlinkSync(path.join(uploadsDir, r.photo)); } catch { /* ignore */ }
+  }
+  q('DELETE FROM notifications WHERE type=? AND ref_id=?').run('report', r.id);
+  q('DELETE FROM reports WHERE id=?').run(r.id);
+  res.json({ ok: true });
 });
 
 app.post('/api/admin/reports/:id/update', requireAdmin, (req: AuthedRequest, res) => {
@@ -841,6 +898,18 @@ app.post('/api/admin/residents/invite', requireAdmin, (req: AuthedRequest, res) 
      VALUES (?,?,?,?,?,?,?,?,?,?)`).run(
     id, req.auth!.nid!, name || '—', phone, address, String(address).split(',')[0] || '', 'invited', code, null, new Date().toISOString());
   res.status(201).json({ id, activationCode: code, expires: null });
+});
+
+// Delete a resident or a pending invitation (and their auth/activity traces).
+app.delete('/api/admin/residents/:id', requireAdmin, (req: AuthedRequest, res) => {
+  const r = q('SELECT * FROM residents WHERE id=? AND neighborhood_id=?').get(req.params.id, req.auth!.nid!) as any;
+  if (!r) return res.status(404).json({ error: 'not found' });
+  q('DELETE FROM device_tokens WHERE user_type=? AND user_id=?').run('resident', r.id);
+  q('DELETE FROM notifications WHERE resident_id=?').run(r.id);
+  q('DELETE FROM votes WHERE resident_id=?').run(r.id);
+  q('DELETE FROM announcement_views WHERE resident_id=?').run(r.id);
+  q('DELETE FROM residents WHERE id=?').run(r.id);
+  res.json({ ok: true });
 });
 
 // ───────────────────────── admin: contacts ─────────────────────────

@@ -37,6 +37,7 @@ class Repo {
     return AdminReport((await api.patch('/admin/reports/$id', body) as Map).cast<String, dynamic>());
   }
 
+  Future<void> deleteReport(String id) => api.delete('/admin/reports/$id');
   Future<AdminReport> addReportUpdate(String id, String text) async =>
       AdminReport((await api.post('/admin/reports/$id/update', {'body': text}) as Map).cast<String, dynamic>());
 
@@ -75,6 +76,8 @@ class Repo {
         .cast<String, dynamic>();
     return r['activationCode'] as String? ?? '';
   }
+
+  Future<void> deleteResident(String id) => api.delete('/admin/residents/$id');
 
   // ── contacts (important; chairman-managed) ──
   Future<List<AdminContact>> contacts() async {

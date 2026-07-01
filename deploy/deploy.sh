@@ -42,6 +42,8 @@ rsync -az --delete \
   --exclude 'apps' \
   --exclude 'packages' \
   docker-compose.yml \
+  docker-compose.https.yml \
+  Caddyfile \
   server \
   web \
   deploy \

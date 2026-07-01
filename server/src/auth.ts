@@ -3,6 +3,21 @@ import type { Request, Response, NextFunction } from 'express';
 
 const SECRET = process.env.JWT_SECRET || 'korshi-dev-secret-change-me';
 
+// Tokens are only as safe as this secret. A known/default value means anyone can
+// forge tokens for any resident or admin — so refuse to run with one in prod.
+const _KNOWN_DEFAULTS = new Set([
+  'korshi-dev-secret-change-me',
+  'korshi-prod-change-me',
+  'change-me',
+  '',
+]);
+if (process.env.NODE_ENV === 'production' && _KNOWN_DEFAULTS.has(SECRET)) {
+  throw new Error(
+    'SECURITY: JWT_SECRET is unset or a known default. Set a strong random ' +
+      'JWT_SECRET (e.g. `openssl rand -hex 32`) in the server environment before deploying.',
+  );
+}
+
 export type Role = 'super' | 'admin' | 'resident';
 export interface TokenPayload {
   sub: string;

@@ -8,7 +8,7 @@ import 'session.dart';
 class ApiConfig {
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://188.244.115.167/api',
+    defaultValue: 'https://korshiapp.kz/api',
   );
 
   /// Set once per app launch so the cover image is re-fetched on each start

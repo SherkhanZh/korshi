@@ -28,11 +28,6 @@
 		<false/>
 		<key>LSRequiresIPhoneOS</key>
 		<true/>
-		<key>NSAppTransportSecurity</key>
-		<dict>
-			<key>NSAllowsArbitraryLoads</key>
-			<true/>
-		</dict>
 		<key>NSCameraUsageDescription</key>
 		<string>Нужно для фотографий в заявках.</string>
 		<key>NSPhotoLibraryUsageDescription</key>

@@ -7,7 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class ApiConfig {
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://188.244.115.167/api',
+    defaultValue: 'https://korshiapp.kz/api',
   );
 }
 

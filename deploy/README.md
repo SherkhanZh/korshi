@@ -48,11 +48,37 @@ docker compose restart api
 docker compose down           # stop everything
 ```
 
+## HTTPS — domain is `korshiapp.kz` ✅
+
+DNS is set: `korshiapp.kz` and `www.korshiapp.kz` both A → `188.244.115.167`.
+The app defaults now point at `https://korshiapp.kz/api` and the cleartext
+allowances have been removed, so the last step is to bring up the HTTPS stack:
+
+1. Make sure ports **80** and **443** are open on the server (no Cloudflare proxy —
+   Let's Encrypt needs to reach Caddy directly on 80).
+2. On the server, add to `/opt/korshi/.env`:
+   ```
+   DOMAIN=korshiapp.kz
+   ```
+   (keep the existing `JWT_SECRET` and `FIREBASE_SERVICE_ACCOUNT` lines).
+3. Deploy the code, then switch to the HTTPS stack (stop the old HTTP one first so
+   port 80 is free for Caddy):
+   ```bash
+   cd /opt/korshi
+   docker compose down                                    # frees :80
+   docker compose -f docker-compose.https.yml up -d --build
+   docker compose -f docker-compose.https.yml logs -f caddy   # watch cert issue (~30s)
+   ```
+   Panel + API will be live at `https://korshiapp.kz` (www redirects to root).
+4. Rebuild/redistribute the apps — they already default to `https://korshiapp.kz/api`
+   with no cleartext, so a plain `flutter build` is enough (no `--dart-define`
+   needed anymore).
+
+To go back to plain HTTP: `docker compose -f docker-compose.https.yml down && docker compose up -d`.
+
 ## Notes
 
-- **HTTP only / by IP** for now. To add a domain + HTTPS later: point DNS at the
-  IP, add `server_name` + a certbot/Let's Encrypt companion (or Caddy/Traefik)
-  in front. Ask and I'll wire it.
+- **HTTP only / by IP** for now (see HTTPS section above for the domain step).
 - The **Flutter client** (`apps/client`) is a mobile app — it isn't part of this
   server deploy. It ships as an APK / to the stores, or as a separate web build.
 - The backend is currently a **skeleton** (`/api/health` + stubbed resource

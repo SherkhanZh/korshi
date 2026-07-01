@@ -150,6 +150,9 @@ export async function patchReport(
     body: JSON.stringify(payload),
   }));
 }
+export async function deleteReport(id: string) {
+  return request(`/admin/reports/${id}`, { method: 'DELETE' });
+}
 export async function addReportUpdate(id: string, text: string) {
   return adaptReport(await request<SrvReport>(`/admin/reports/${id}/update`, {
     method: 'POST',
@@ -254,6 +257,9 @@ export async function inviteResident(body: { phone: string; address: string; nam
     method: 'POST',
     body: JSON.stringify(body),
   });
+}
+export async function deleteResident(id: string) {
+  return request(`/admin/residents/${id}`, { method: 'DELETE' });
 }
 
 // ── cover ──

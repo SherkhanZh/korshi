@@ -6,13 +6,14 @@ import {
   CheckCircle2,
   MessageSquare,
   ThumbsUp,
+  Trash2,
 } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
 import { categoryMeta, reportStatusMeta } from '../lib/meta';
 import type { Category, Report, ReportStatus, ReportStage } from '../types';
-import { fetchReports, patchReport, addReportUpdate, reportPhotoUrl } from '../lib/api';
+import { fetchReports, patchReport, addReportUpdate, reportPhotoUrl, deleteReport } from '../lib/api';
 import { useAsync } from '../lib/useAsync';
 import { useI18n } from '../lib/i18n';
 
@@ -193,6 +194,21 @@ export function Reports() {
         onResolve={(r) =>
           run(patchReport(r.id, { status: 'resolved' }).then(() => addReportUpdate(r.id, 'Заявка решена')))
         }
+        onDelete={(r) => {
+          if (!confirm(tr('Удалить эту заявку? Действие необратимо.', 'Бұл өтінішті жою керек пе? Әрекет қайтарылмайды.'))) return;
+          setBusy(true);
+          deleteReport(r.id)
+            .then(() => {
+              setItems((prev) => {
+                const next = prev.filter((x) => x.id !== r.id);
+                setData(next);
+                return next;
+              });
+              setSelected(null);
+            })
+            .catch((e) => alert(e instanceof Error ? e.message : tr('Не удалось удалить', 'Жою мүмкін болмады')))
+            .finally(() => setBusy(false));
+        }}
         tr={tr}
       />
     </div>
@@ -207,6 +223,7 @@ function ReportDetail({
   onReply,
   onNote,
   onResolve,
+  onDelete,
   tr,
 }: {
   report: Report | null;
@@ -216,6 +233,7 @@ function ReportDetail({
   onReply: (r: Report, text: string) => void;
   onNote: (r: Report, note: string) => void;
   onResolve: (r: Report) => void;
+  onDelete: (r: Report) => void;
   tr: (ru: string, kk: string) => string;
 }) {
   const [note, setNote] = useState('');
@@ -383,6 +401,15 @@ function ReportDetail({
           <CheckCircle2 size={16} /> {tr('Отметить решённой', 'Шешілді деп белгілеу')}
         </button>
       </div>
+
+      {/* Delete (e.g. spam) */}
+      <button
+        onClick={() => onDelete(report)}
+        disabled={busy}
+        className="mt-3 flex w-full items-center justify-center gap-1.5 text-sm font-semibold text-[#C0492E] hover:underline disabled:opacity-50"
+      >
+        <Trash2 size={15} /> {tr('Удалить заявку (спам)', 'Өтінішті жою (спам)')}
+      </button>
     </Modal>
   );
 }

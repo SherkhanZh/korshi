@@ -394,9 +394,47 @@ class _ReportDetailSheetState extends State<_ReportDetailSheet> {
               icon: const Icon(Icons.check_circle_rounded, size: 18),
               label: Text(loc('Отметить решённой', 'Шешілді деп белгілеу')),
             ),
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: _busy
+                  ? null
+                  : () async {
+                      final ok = await _confirmDelete(context,
+                          loc('Удалить заявку (спам)? Действие необратимо.', 'Өтінішті жою (спам)? Әрекет қайтарылмайды.'));
+                      if (!ok) return;
+                      setState(() => _busy = true);
+                      try {
+                        await repo.deleteReport(r.id);
+                        widget.onChanged();
+                        if (mounted) Navigator.pop(context);
+                      } on ApiException catch (e) {
+                        if (mounted) {
+                          setState(() => _busy = false);
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+                        }
+                      }
+                    },
+              style: TextButton.styleFrom(foregroundColor: C.danger),
+              icon: const Icon(Icons.delete_outline_rounded, size: 18),
+              label: Text(loc('Удалить заявку (спам)', 'Өтінішті жою (спам)')),
+            ),
           ],
         ),
       ),
     );
   }
+}
+
+Future<bool> _confirmDelete(BuildContext context, String message) async {
+  final r = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      content: Text(message),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(loc('Отмена', 'Болдырмау'))),
+        TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(loc('Удалить', 'Жою'), style: const TextStyle(color: C.danger))),
+      ],
+    ),
+  );
+  return r ?? false;
 }

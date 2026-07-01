@@ -15,13 +15,14 @@ import {
   FileText,
   BarChart3,
   Megaphone,
+  Trash2,
 } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
 import { inviteMessage } from '../data/mockData';
 import type { Resident, ResidentStatus } from '../types';
-import { fetchResidents, inviteResident } from '../lib/api';
+import { fetchResidents, inviteResident, deleteResident } from '../lib/api';
 import { useAsync } from '../lib/useAsync';
 import { useI18n } from '../lib/i18n';
 
@@ -190,7 +191,23 @@ export function Residents() {
           onCreated={reload}
         />
       )}
-      <ResidentDetail resident={selected} onClose={() => setSelected(null)} />
+      <ResidentDetail
+        resident={selected}
+        onClose={() => setSelected(null)}
+        onDelete={async (r) => {
+          const label = r.status === 'active'
+            ? tr('Удалить жителя? Он потеряет доступ к приложению.', 'Тұрғынды жою керек пе? Ол қосымшаға қол жеткізе алмайды.')
+            : tr('Удалить приглашение?', 'Шақыруды жою керек пе?');
+          if (!confirm(label)) return;
+          try {
+            await deleteResident(r.id);
+            setSelected(null);
+            reload();
+          } catch (e) {
+            alert(e instanceof Error ? e.message : tr('Не удалось удалить', 'Жою мүмкін болмады'));
+          }
+        }}
+      />
     </div>
   );
 }
@@ -307,7 +324,11 @@ function InviteModal({
 }
 
 // ─── Resident detail ───
-function ResidentDetail({ resident, onClose }: { resident: Resident | null; onClose: () => void }) {
+function ResidentDetail({ resident, onClose, onDelete }: {
+  resident: Resident | null;
+  onClose: () => void;
+  onDelete: (r: Resident) => void;
+}) {
   const { t: tr } = useI18n();
   if (!resident) return null;
   const m = resident.metrics;
@@ -395,6 +416,16 @@ function ResidentDetail({ resident, onClose }: { resident: Resident | null; onCl
           <p className="mt-0.5 text-ink2">{resident.adminNote}</p>
         </div>
       )}
+
+      <button
+        onClick={() => onDelete(resident)}
+        className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-xl border border-[#F1C9C0] py-2.5 text-sm font-semibold text-[#C0492E] hover:bg-[#FBE6E1]"
+      >
+        <Trash2 size={15} />
+        {resident.status === 'active'
+          ? tr('Удалить жителя', 'Тұрғынды жою')
+          : tr('Удалить приглашение', 'Шақыруды жою')}
+      </button>
     </Modal>
   );
 }

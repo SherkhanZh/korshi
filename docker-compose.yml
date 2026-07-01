@@ -2,7 +2,8 @@
 #   web : nginx serving the built admin panel + reverse-proxying /api → api
 #   api : Express/TS backend (SQLite persisted on the korshi_data volume)
 #
-# Bring up:  docker compose up -d --build
+# Bring up (HTTP):  docker compose up -d --build
+# For HTTPS instead, see docker-compose.https.yml (needs a domain).
 services:
   api:
     build: ./server
