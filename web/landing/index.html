@@ -33,11 +33,10 @@
   .hero h1{font-size:clamp(30px,5vw,48px);line-height:1.15;font-weight:800;max-width:760px;margin:0 auto 18px}
   .hero h1 em{color:var(--green);font-style:normal}
   .hero p{font-size:19px;color:var(--muted);max-width:620px;margin:0 auto 32px}
-  .stores{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
-  .store-btn{display:flex;align-items:center;gap:10px;background:var(--ink);color:#fff;border-radius:12px;padding:10px 20px;min-width:180px;text-align:left}
-  .store-btn:hover{text-decoration:none;opacity:.9}
-  .store-btn .small{font-size:11px;opacity:.75;display:block;line-height:1.2}
-  .store-btn .big{font-size:16px;font-weight:700;line-height:1.25}
+  .stores{display:flex;gap:14px;justify-content:center;align-items:center;flex-wrap:wrap}
+  .store-badge{display:inline-flex;transition:opacity .15s}
+  .store-badge:hover{opacity:.85;text-decoration:none}
+  .store-badge img{height:52px;width:auto;display:block}
   .store-soon{font-size:13px;color:var(--muted);margin-top:12px}
 
   section{padding:56px 0}
@@ -92,13 +91,11 @@
     <p>Korshi тұрғындар мен ПИК төрағаларын байланыстырады: аула мәселелері туралы фотомен хабарлаңыз, өтініштің мәртебесін бақылаңыз, сауалнамаларға қатысыңыз және хабарландыруларды жіберіп алмаңыз.</p>
   </div>
   <div class="stores">
-    <a class="store-btn" href="#" onclick="return false;">
-      <span style="font-size:26px"></span>
-      <span><span class="small ru">Скоро в</span><span class="small kk">Жақында</span><span class="big">App Store</span></span>
+    <a class="store-badge" href="#" aria-label="Download on the App Store">
+      <img src="app-store-badge.svg" alt="Download on the App Store" height="52">
     </a>
-    <a class="store-btn" href="#" onclick="return false;">
-      <span style="font-size:24px">▶</span>
-      <span><span class="small ru">Скоро в</span><span class="small kk">Жақында</span><span class="big">Google Play</span></span>
+    <a class="store-badge" href="#" aria-label="Get it on Google Play">
+      <img src="google-play-badge.svg" alt="Get it on Google Play" height="52">
     </a>
   </div>
   <p class="store-soon ru">Приложение готовится к публикации. Оставьте заявку — сообщим о запуске: <a href="mailto:hello@bikz.dev">hello@bikz.dev</a></p>
