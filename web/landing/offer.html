@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru" data-lang="ru">
+<html lang="kk" data-lang="kk">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -35,8 +35,8 @@
   <div class="wrap nav">
     <a class="logo" href="index.html"><span class="logo-mark">K</span>Korshi</a>
     <div class="lang-switch">
-      <button id="btn-ru" class="active" onclick="setLang('ru')">Рус</button>
-      <button id="btn-kk" onclick="setLang('kk')">Қаз</button>
+      <button id="btn-kk" class="active" onclick="setLang('kk')">Қаз</button>
+      <button id="btn-ru" onclick="setLang('ru')">Рус</button>
     </div>
   </div>
 </header>
@@ -211,7 +211,7 @@ function setLang(l){
   document.getElementById('btn-kk').classList.toggle('active', l==='kk');
   try{localStorage.setItem('korshi-lang', l);}catch(e){}
 }
-try{ if(localStorage.getItem('korshi-lang')==='kk') setLang('kk'); }catch(e){}
+try{ if(localStorage.getItem('korshi-lang')==='ru') setLang('ru'); }catch(e){}
 </script>
 </body>
 </html>

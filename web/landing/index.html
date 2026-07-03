@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru" data-lang="ru">
+<html lang="kk" data-lang="kk">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -66,7 +66,8 @@
   .foot-col h4{font-size:14px;color:var(--ink);margin-bottom:10px}
   .foot-col p, .foot-col li{margin-bottom:6px}
   .foot-col ul{list-style:none}
-  .copyright{margin-top:28px;font-size:13px}
+  .copyright{margin-top:28px;font-size:13px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+  .copyright a{color:var(--green);font-weight:600}
 </style>
 </head>
 <body>
@@ -75,8 +76,8 @@
   <div class="wrap nav">
     <div class="logo"><span class="logo-mark">K</span>Korshi</div>
     <div class="lang-switch">
-      <button id="btn-ru" class="active" onclick="setLang('ru')">Рус</button>
-      <button id="btn-kk" onclick="setLang('kk')">Қаз</button>
+      <button id="btn-kk" class="active" onclick="setLang('kk')">Қаз</button>
+      <button id="btn-ru" onclick="setLang('ru')">Рус</button>
     </div>
   </div>
 </header>
@@ -198,14 +199,13 @@
       </div>
       <div class="foot-col">
         <h4><span class="ru">Контакты</span><span class="kk">Байланыс</span></h4>
-        <p>ИП Jantali Enterprises</p>
-        <p><span class="ru">ИИН</span><span class="kk">ЖСН</span> 940405300027</p>
-        <p class="ru">Республика Казахстан, г. Алматы, мкр Орбита 2, 21-9</p>
-        <p class="kk">Қазақстан Республикасы, Алматы қ., Орбита 2 ш/а, 21-9</p>
         <p><a href="mailto:hello@bikz.dev">hello@bikz.dev</a></p>
       </div>
     </div>
-    <p class="copyright">© 2026 Korshi · ИП Jantali Enterprises</p>
+    <div class="copyright">
+      <span>© 2026 Korshi · BIKZ.DEV</span>
+      <a href="https://bikz.dev" target="_blank" rel="noopener">by BIKZ.DEV</a>
+    </div>
   </div>
 </footer>
 
@@ -219,7 +219,7 @@ function setLang(l){
 }
 try{
   var saved = localStorage.getItem('korshi-lang');
-  if(saved==='kk') setLang('kk');
+  if(saved==='ru') setLang('ru');
 }catch(e){}
 </script>
 </body>
