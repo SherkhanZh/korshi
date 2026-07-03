@@ -1,5 +1,6 @@
 import { DatabaseSync } from 'node:sqlite';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import path from 'path';
 import fs from 'fs';
 
@@ -249,21 +250,41 @@ export function createNeighborhood(name: string, adminEmail: string, adminPasswo
   return id;
 }
 
-// ─── Seed (only when empty) ───
+// ─── Seed ───
+// Always ensures a super admin exists. Demo content (neighborhood, admin,
+// residents, reports, …) is seeded only outside production, or when
+// SEED_DEMO=1 is set explicitly. Never seed demo credentials into prod.
 export function seed() {
   const N = DEFAULT_NID;
+
+  // Super admin (manages neighborhoods; not tied to one).
+  if (count("SELECT COUNT(*) AS n FROM admins WHERE role='super'") === 0) {
+    const email = (process.env.SUPERADMIN_EMAIL || 'superadmin@korshi.kz').toLowerCase();
+    let password = process.env.SUPERADMIN_PASSWORD || '';
+    if (!password) {
+      // No password provided: generate a strong one and print it ONCE so the
+      // operator can log in and is forced to store it somewhere safe.
+      password = crypto.randomBytes(12).toString('base64url');
+      // eslint-disable-next-line no-console
+      console.log(
+        `\n[seed] Created super admin ${email}\n[seed] One-time generated password: ${password}\n` +
+          '[seed] Store it now — it will not be shown again. (Set SUPERADMIN_PASSWORD to control it.)\n',
+      );
+    }
+    db.prepare('INSERT INTO admins (email,password_hash,role,neighborhood_id) VALUES (?,?,?,?)').run(
+      email, bcrypt.hashSync(password, 10), 'super', null,
+    );
+  }
+
+  const demo = process.env.SEED_DEMO === '1'
+    || (process.env.NODE_ENV !== 'production' && process.env.SEED_DEMO !== '0');
+  if (!demo) return;
 
   if (count('SELECT COUNT(*) AS n FROM neighborhoods') === 0) {
     db.prepare('INSERT INTO neighborhoods (id,name,created_at) VALUES (?,?,?)').run(N, 'мкр Кок-Тобе', new Date().toISOString());
   }
 
-  // Super admin (manages neighborhoods; not tied to one).
-  if (count("SELECT COUNT(*) AS n FROM admins WHERE role='super'") === 0) {
-    db.prepare('INSERT INTO admins (email,password_hash,role,neighborhood_id) VALUES (?,?,?,?)').run(
-      'superadmin@korshi.kz', bcrypt.hashSync('super123', 10), 'super', null,
-    );
-  }
-  // Default neighborhood admin.
+  // Default neighborhood admin (demo only).
   if (count("SELECT COUNT(*) AS n FROM admins WHERE email='admin@korshi.kz'") === 0) {
     db.prepare('INSERT INTO admins (email,password_hash,role,neighborhood_id) VALUES (?,?,?,?)').run(
       'admin@korshi.kz', bcrypt.hashSync('admin123', 10), 'admin', N,

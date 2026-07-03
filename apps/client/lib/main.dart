@@ -69,7 +69,15 @@ class _KorshiAppState extends State<KorshiApp> with WidgetsBindingObserver {
             onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
             child: child,
           ),
-          home: SplashGate(child: isLoggedIn ? const MainShell() : const WelcomeScreen()),
+          // Watch the token so an expired session (cleared on a 401) drops the
+          // resident back to onboarding instead of stranding them on an error.
+          home: SplashGate(
+            child: ValueListenableBuilder<String?>(
+              valueListenable: authToken,
+              builder: (context, token, _) =>
+                  token != null ? const MainShell() : const WelcomeScreen(),
+            ),
+          ),
         );
       },
     );

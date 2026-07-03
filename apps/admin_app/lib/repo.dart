@@ -41,7 +41,9 @@ class Repo {
   Future<AdminReport> addReportUpdate(String id, String text) async =>
       AdminReport((await api.post('/admin/reports/$id/update', {'body': text}) as Map).cast<String, dynamic>());
 
-  String reportPhotoUrl(String id) => '${ApiConfig.baseUrl}/reports/$id/photo?token=${adminToken.value ?? ''}';
+  // No token in the URL — the photo is fetched with an Authorization header
+  // (see reports.dart) so the JWT never lands in proxy logs or the image cache.
+  String reportPhotoUrl(String id) => '${ApiConfig.baseUrl}/reports/$id/photo';
 
   // ── announcements ──
   Future<List<AdminAnnouncement>> announcements() async {

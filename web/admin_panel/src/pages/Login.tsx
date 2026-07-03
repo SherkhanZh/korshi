@@ -8,7 +8,7 @@ export function Login() {
   const { login } = useAuth();
   const { t } = useI18n();
   const navigate = useNavigate();
-  const [email, setEmail] = useState('admin@korshi.kz');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -72,10 +72,6 @@ export function Login() {
             {busy ? t('Вход…', 'Кіру…') : t('Войти', 'Кіру')}
           </button>
         </form>
-
-        <p className="mt-4 text-center text-xs text-ink3">
-          По умолчанию: admin@korshi.kz / admin123
-        </p>
       </div>
     </div>
   );

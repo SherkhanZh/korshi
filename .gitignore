@@ -34,3 +34,12 @@ venv/
 
 # ─── Logs ───
 *.log
+
+# ─── Android release signing (never commit keys) ───
+*.jks
+*.keystore
+key.properties
+
+# ─── Build junk ───
+*.timestamp-*.mjs
+*.tsbuildinfo

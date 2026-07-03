@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ru" data-lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Korshi — приложение для жителей и КСК</title>
+<meta name="description" content="Korshi связывает жителей и председателей КСК: заявки о проблемах двора с фото, опросы, объявления и контакты — в одном приложении.">
+<style>
+  :root{
+    --green:#1f7a5c; --green-dark:#175c45; --green-light:#e7f4ef;
+    --ink:#1c2b26; --muted:#5c6f68; --bg:#fbfdfc; --card:#ffffff;
+    --border:#e2ece8; --radius:16px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.6}
+  a{color:var(--green);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 20px}
+
+  /* language toggle */
+  [data-lang="ru"] .kk{display:none!important}
+  [data-lang="kk"] .ru{display:none!important}
+  .lang-switch{display:flex;gap:2px;background:var(--green-light);border-radius:999px;padding:3px}
+  .lang-switch button{border:0;background:transparent;padding:5px 14px;border-radius:999px;font-size:14px;font-weight:600;color:var(--green-dark);cursor:pointer}
+  .lang-switch button.active{background:var(--green);color:#fff}
+
+  header{position:sticky;top:0;background:rgba(251,253,252,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--border);z-index:10}
+  .nav{display:flex;align-items:center;justify-content:space-between;height:64px}
+  .logo{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:800;color:var(--ink)}
+  .logo-mark{width:34px;height:34px;border-radius:10px;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px}
+
+  .hero{padding:72px 0 56px;text-align:center}
+  .hero h1{font-size:clamp(30px,5vw,48px);line-height:1.15;font-weight:800;max-width:760px;margin:0 auto 18px}
+  .hero h1 em{color:var(--green);font-style:normal}
+  .hero p{font-size:19px;color:var(--muted);max-width:620px;margin:0 auto 32px}
+  .stores{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+  .store-btn{display:flex;align-items:center;gap:10px;background:var(--ink);color:#fff;border-radius:12px;padding:10px 20px;min-width:180px;text-align:left}
+  .store-btn:hover{text-decoration:none;opacity:.9}
+  .store-btn .small{font-size:11px;opacity:.75;display:block;line-height:1.2}
+  .store-btn .big{font-size:16px;font-weight:700;line-height:1.25}
+  .store-soon{font-size:13px;color:var(--muted);margin-top:12px}
+
+  section{padding:56px 0}
+  .section-title{font-size:clamp(24px,3.5vw,34px);font-weight:800;text-align:center;margin-bottom:12px}
+  .section-sub{text-align:center;color:var(--muted);max-width:560px;margin:0 auto 40px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:20px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:26px}
+  .card .icon{width:44px;height:44px;border-radius:12px;background:var(--green-light);display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:14px}
+  .card h3{font-size:17px;margin-bottom:8px}
+  .card p{font-size:15px;color:var(--muted)}
+
+  .split{background:var(--green-light)}
+  .steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:20px;counter-reset:step}
+  .step{background:var(--card);border-radius:var(--radius);padding:26px;border:1px solid var(--border)}
+  .step .num{width:32px;height:32px;border-radius:50%;background:var(--green);color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;margin-bottom:12px}
+  .step h3{font-size:16px;margin-bottom:6px}
+  .step p{font-size:14px;color:var(--muted)}
+
+  .cta{background:var(--green);border-radius:var(--radius);padding:48px 28px;text-align:center;color:#fff}
+  .cta h2{font-size:clamp(22px,3vw,30px);margin-bottom:10px}
+  .cta p{opacity:.9;max-width:520px;margin:0 auto 24px}
+  .cta a.btn{display:inline-block;background:#fff;color:var(--green-dark);font-weight:700;border-radius:12px;padding:12px 28px}
+  .cta a.btn:hover{text-decoration:none;opacity:.92}
+
+  footer{border-top:1px solid var(--border);padding:36px 0 44px;font-size:14px;color:var(--muted)}
+  .foot-grid{display:flex;flex-wrap:wrap;gap:28px;justify-content:space-between}
+  .foot-col h4{font-size:14px;color:var(--ink);margin-bottom:10px}
+  .foot-col p, .foot-col li{margin-bottom:6px}
+  .foot-col ul{list-style:none}
+  .copyright{margin-top:28px;font-size:13px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap nav">
+    <div class="logo"><span class="logo-mark">K</span>Korshi</div>
+    <div class="lang-switch">
+      <button id="btn-ru" class="active" onclick="setLang('ru')">Рус</button>
+      <button id="btn-kk" onclick="setLang('kk')">Қаз</button>
+    </div>
+  </div>
+</header>
+
+<section class="hero wrap">
+  <div class="ru">
+    <h1>Двор, в котором <em>слышат</em> каждого жителя</h1>
+    <p>Korshi связывает жителей и председателей КСК: сообщайте о проблемах двора с фото, следите за статусом заявки, участвуйте в опросах и не пропускайте объявления.</p>
+  </div>
+  <div class="kk">
+    <h1>Әр тұрғынның дауысы <em>естілетін</em> аула</h1>
+    <p>Korshi тұрғындар мен ПИК төрағаларын байланыстырады: аула мәселелері туралы фотомен хабарлаңыз, өтініштің мәртебесін бақылаңыз, сауалнамаларға қатысыңыз және хабарландыруларды жіберіп алмаңыз.</p>
+  </div>
+  <div class="stores">
+    <a class="store-btn" href="#" onclick="return false;">
+      <span style="font-size:26px"></span>
+      <span><span class="small ru">Скоро в</span><span class="small kk">Жақында</span><span class="big">App Store</span></span>
+    </a>
+    <a class="store-btn" href="#" onclick="return false;">
+      <span style="font-size:24px">▶</span>
+      <span><span class="small ru">Скоро в</span><span class="small kk">Жақында</span><span class="big">Google Play</span></span>
+    </a>
+  </div>
+  <p class="store-soon ru">Приложение готовится к публикации. Оставьте заявку — сообщим о запуске: <a href="mailto:hello@bikz.dev">hello@bikz.dev</a></p>
+  <p class="store-soon kk">Қосымша жариялауға дайындалып жатыр. Іске қосылғаны туралы хабарлаймыз: <a href="mailto:hello@bikz.dev">hello@bikz.dev</a></p>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2 class="section-title"><span class="ru">Для жителей</span><span class="kk">Тұрғындарға</span></h2>
+    <p class="section-sub"><span class="ru">Всё, что происходит в вашем дворе, — в одном приложении.</span><span class="kk">Аулаңызда болып жатқанның бәрі — бір қосымшада.</span></p>
+    <div class="cards">
+      <div class="card"><div class="icon">📸</div>
+        <h3><span class="ru">Заявки с фото</span><span class="kk">Фотомен өтініштер</span></h3>
+        <p><span class="ru">Сфотографируйте проблему — сломанную лавочку, мусор, яму — и отправьте председателю в пару касаний.</span><span class="kk">Мәселені суретке түсіріңіз — сынған орындық, қоқыс, шұңқыр — және төрағаға бірнеше рет басып жіберіңіз.</span></p>
+      </div>
+      <div class="card"><div class="icon">🔔</div>
+        <h3><span class="ru">Статус в реальном времени</span><span class="kk">Нақты уақыттағы мәртебе</span></h3>
+        <p><span class="ru">Получайте уведомления, когда заявка принята в работу и когда проблема решена.</span><span class="kk">Өтініш жұмысқа қабылданғанда және мәселе шешілгенде хабарлама аласыз.</span></p>
+      </div>
+      <div class="card"><div class="icon">🗳️</div>
+        <h3><span class="ru">Опросы</span><span class="kk">Сауалнамалар</span></h3>
+        <p><span class="ru">Голосуйте по важным вопросам двора — от ремонта до благоустройства — прямо с телефона.</span><span class="kk">Ауланың маңызды мәселелері бойынша — жөндеуден абаттандыруға дейін — телефоннан дауыс беріңіз.</span></p>
+      </div>
+      <div class="card"><div class="icon">📣</div>
+        <h3><span class="ru">Объявления и контакты</span><span class="kk">Хабарландырулар мен байланыстар</span></h3>
+        <p><span class="ru">Объявления КСК, отключения, собрания и полезные контакты — всегда под рукой.</span><span class="kk">ПИК хабарландырулары, сумен/жарықпен қамту үзілістері, жиналыстар және пайдалы байланыстар — әрқашан қол астында.</span></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="split">
+  <div class="wrap">
+    <h2 class="section-title"><span class="ru">Для председателей КСК</span><span class="kk">ПИК төрағаларына</span></h2>
+    <p class="section-sub"><span class="ru">Порядок вместо чатов на сотни сообщений и звонков в любое время суток.</span><span class="kk">Жүздеген хабарламалы чаттар мен тәулік бойғы қоңыраулардың орнына — тәртіп.</span></p>
+    <div class="cards">
+      <div class="card"><div class="icon">📋</div>
+        <h3><span class="ru">Все заявки в одном месте</span><span class="kk">Барлық өтініш бір жерде</span></h3>
+        <p><span class="ru">Принимайте обращения жителей с фото и адресом, меняйте статусы, оставляйте комментарии.</span><span class="kk">Тұрғындардың фотосы мен мекенжайы бар өтініштерін қабылдаңыз, мәртебесін өзгертіңіз, түсініктеме қалдырыңыз.</span></p>
+      </div>
+      <div class="card"><div class="icon">👥</div>
+        <h3><span class="ru">База жителей</span><span class="kk">Тұрғындар базасы</span></h3>
+        <p><span class="ru">Управляйте списком жителей и приглашайте новых по инвайт-коду.</span><span class="kk">Тұрғындар тізімін басқарыңыз және жаңаларын шақыру коды арқылы қосыңыз.</span></p>
+      </div>
+      <div class="card"><div class="icon">📢</div>
+        <h3><span class="ru">Объявления и опросы</span><span class="kk">Хабарландыру және сауалнама</span></h3>
+        <p><span class="ru">Публикуйте новости и запускайте голосования — каждый житель получит push-уведомление.</span><span class="kk">Жаңалықтар жариялаңыз және дауыс беру бастаңыз — әр тұрғынға push-хабарлама келеді.</span></p>
+      </div>
+      <div class="card"><div class="icon">💻</div>
+        <h3><span class="ru">Веб-панель</span><span class="kk">Веб-панель</span></h3>
+        <p><span class="ru">Полноценная панель управления районом в браузере — в дополнение к мобильному приложению.</span><span class="kk">Мобильді қосымшаға қоса — браузердегі толыққанды басқару панелі.</span></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2 class="section-title"><span class="ru">Как это работает</span><span class="kk">Бұл қалай жұмыс істейді</span></h2>
+    <p class="section-sub"><span class="ru">Подключение занимает один день.</span><span class="kk">Қосылу бір-ақ күнді алады.</span></p>
+    <div class="steps">
+      <div class="step"><div class="num">1</div>
+        <h3><span class="ru">КСК подключается</span><span class="kk">ПИК қосылады</span></h3>
+        <p><span class="ru">Председатель получает доступ к панели управления своим районом.</span><span class="kk">Төраға өз ауданын басқару панеліне қол жеткізеді.</span></p>
+      </div>
+      <div class="step"><div class="num">2</div>
+        <h3><span class="ru">Жители получают коды</span><span class="kk">Тұрғындар код алады</span></h3>
+        <p><span class="ru">Каждый житель входит в приложение по номеру телефона и инвайт-коду.</span><span class="kk">Әр тұрғын қосымшаға телефон нөмірі мен шақыру коды арқылы кіреді.</span></p>
+      </div>
+      <div class="step"><div class="num">3</div>
+        <h3><span class="ru">Проблемы решаются</span><span class="kk">Мәселелер шешіледі</span></h3>
+        <p><span class="ru">Заявки, опросы и объявления идут по прозрачному, понятному каналу.</span><span class="kk">Өтініштер, сауалнамалар мен хабарландырулар ашық әрі түсінікті арна арқылы жүреді.</span></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="wrap" style="padding-top:0">
+  <div class="cta">
+    <h2><span class="ru">Хотите подключить свой КСК?</span><span class="kk">Өз ПИК-іңізді қосқыңыз келе ме?</span></h2>
+    <p><span class="ru">Сервис сейчас бесплатный. Напишите нам — подключим ваш район и поможем с запуском.</span><span class="kk">Сервис қазір тегін. Бізге жазыңыз — ауданыңызды қосып, іске қосуға көмектесеміз.</span></p>
+    <a class="btn" href="mailto:hello@bikz.dev">hello@bikz.dev</a>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-col">
+        <h4>Korshi</h4>
+        <p class="ru">Приложение для жителей и председателей КСК.</p>
+        <p class="kk">Тұрғындар мен ПИК төрағаларына арналған қосымша.</p>
+      </div>
+      <div class="foot-col">
+        <h4><span class="ru">Документы</span><span class="kk">Құжаттар</span></h4>
+        <ul>
+          <li><a href="privacy.html"><span class="ru">Политика конфиденциальности</span><span class="kk">Құпиялылық саясаты</span></a></li>
+          <li><a href="offer.html"><span class="ru">Публичная оферта</span><span class="kk">Жария оферта</span></a></li>
+        </ul>
+      </div>
+      <div class="foot-col">
+        <h4><span class="ru">Контакты</span><span class="kk">Байланыс</span></h4>
+        <p>ИП Jantali Enterprises</p>
+        <p><span class="ru">ИИН</span><span class="kk">ЖСН</span> 940405300027</p>
+        <p class="ru">Республика Казахстан, г. Алматы, мкр Орбита 2, 21-9</p>
+        <p class="kk">Қазақстан Республикасы, Алматы қ., Орбита 2 ш/а, 21-9</p>
+        <p><a href="mailto:hello@bikz.dev">hello@bikz.dev</a></p>
+      </div>
+    </div>
+    <p class="copyright">© 2026 Korshi · ИП Jantali Enterprises</p>
+  </div>
+</footer>
+
+<script>
+function setLang(l){
+  document.documentElement.dataset.lang = l;
+  document.documentElement.lang = l === 'kk' ? 'kk' : 'ru';
+  document.getElementById('btn-ru').classList.toggle('active', l==='ru');
+  document.getElementById('btn-kk').classList.toggle('active', l==='kk');
+  try{localStorage.setItem('korshi-lang', l);}catch(e){}
+}
+try{
+  var saved = localStorage.getItem('korshi-lang');
+  if(saved==='kk') setLang('kk');
+}catch(e){}
+</script>
+</body>
+</html>

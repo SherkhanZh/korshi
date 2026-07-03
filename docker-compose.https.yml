@@ -17,7 +17,8 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - TZ=Asia/Almaty
-      - JWT_SECRET=${JWT_SECRET:-korshi-prod-change-me}
+      # Required. Generate one with `openssl rand -hex 32` and put it in .env.
+      - JWT_SECRET=${JWT_SECRET:?set JWT_SECRET in .env (openssl rand -hex 32)}
       - FIREBASE_SERVICE_ACCOUNT=${FIREBASE_SERVICE_ACCOUNT:-}
     expose:
       - "3000"
@@ -44,6 +45,9 @@ services:
       - "443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Public landing page (index, privacy policy, public offer) served by
+      # Caddy at the root domain; the admin panel lives on panel.$DOMAIN.
+      - ./web/landing:/srv/landing:ro
       - caddy_data:/data
       - caddy_config:/config
 

@@ -13,7 +13,7 @@ import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
 import { categoryMeta, reportStatusMeta } from '../lib/meta';
 import type { Category, Report, ReportStatus, ReportStage } from '../types';
-import { fetchReports, patchReport, addReportUpdate, reportPhotoUrl, deleteReport } from '../lib/api';
+import { fetchReports, patchReport, addReportUpdate, fetchReportPhoto, deleteReport } from '../lib/api';
 import { useAsync } from '../lib/useAsync';
 import { useI18n } from '../lib/i18n';
 
@@ -215,6 +215,30 @@ export function Reports() {
   );
 }
 
+// Loads the report photo through the API with an Authorization header (via a
+// blob object URL) so the JWT never travels in the image URL.
+function ReportPhoto({ id, alt }: { id: string; alt: string }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let objUrl: string | null = null;
+    let cancelled = false;
+    fetchReportPhoto(id)
+      .then((u) => {
+        if (cancelled) { URL.revokeObjectURL(u); return; }
+        objUrl = u;
+        setUrl(u);
+      })
+      .catch(() => { if (!cancelled) setFailed(true); });
+    return () => {
+      cancelled = true;
+      if (objUrl) URL.revokeObjectURL(objUrl);
+    };
+  }, [id]);
+  if (failed || !url) return null;
+  return <img src={url} alt={alt} className="mt-3 max-h-72 w-full rounded-xl object-cover" />;
+}
+
 function ReportDetail({
   report,
   busy,
@@ -276,14 +300,7 @@ function ReportDetail({
         <p className="mt-3 rounded-xl bg-surface p-3 text-sm text-ink2">{report.description}</p>
       )}
 
-      {report.hasPhoto && (
-        <img
-          src={reportPhotoUrl(report.id)}
-          alt={tr('Фото заявки', 'Өтініш фотосы')}
-          className="mt-3 max-h-72 w-full rounded-xl object-cover"
-          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-        />
-      )}
+      {report.hasPhoto && <ReportPhoto id={report.id} alt={tr('Фото заявки', 'Өтініш фотосы')} />}
 
       {/* Reply to resident — posts a visible update */}
       <div className="mt-4">

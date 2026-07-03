@@ -271,6 +271,9 @@ class _ReportDetailSheetState extends State<_ReportDetailSheet> {
                 borderRadius: BorderRadius.circular(14),
                 child: Image.network(
                   repo.reportPhotoUrl(r.id),
+                  headers: adminToken.value != null
+                      ? {'Authorization': 'Bearer ${adminToken.value}'}
+                      : null,
                   fit: BoxFit.cover,
                   width: double.infinity,
                   errorBuilder: (_, __, ___) => Container(

@@ -33,11 +33,20 @@ sudo apt-get install -y \
 
 sudo systemctl enable --now docker
 
-# Firewall: allow SSH + HTTP (skip if ufw inactive / not desired)
+# Firewall: allow SSH + HTTP + HTTPS (skip if ufw inactive / not desired)
 sudo ufw allow OpenSSH || true
 sudo ufw allow 80/tcp || true
+sudo ufw allow 443/tcp || true
+
+# Nightly database backup (03:30 server time). The script lives in the deployed
+# tree, so this becomes active after the first deploy/deploy.sh run.
+sudo tee /etc/cron.d/korshi-backup > /dev/null <<'CRON'
+30 3 * * * root /opt/korshi/deploy/backup.sh >> /var/log/korshi-backup.log 2>&1
+CRON
+sudo chmod 644 /etc/cron.d/korshi-backup
 
 echo "✓ Docker installed:"
 docker --version
 docker compose version
+echo "✓ Nightly backup cron installed (/etc/cron.d/korshi-backup → /var/backups/korshi)."
 echo "✓ Server ready. Now run deploy/deploy.sh from your machine."

@@ -12,7 +12,7 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _email = TextEditingController(text: 'admin@korshi.kz');
+  final _email = TextEditingController();
   final _password = TextEditingController();
   bool _busy = false;
   bool _obscure = true;
@@ -121,11 +121,6 @@ class _LoginScreenState extends State<LoginScreen> {
                             width: 22, height: 22,
                             child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white))
                         : Text(loc('Войти', 'Кіру')),
-                  ),
-                  const SizedBox(height: 12),
-                  const Center(
-                    child: Text('admin@korshi.kz / admin123',
-                        style: TextStyle(color: C.ink3, fontSize: 12)),
                   ),
                 ],
               ),

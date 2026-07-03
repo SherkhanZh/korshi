@@ -159,9 +159,22 @@ export async function addReportUpdate(id: string, text: string) {
     body: JSON.stringify({ body: text }),
   }));
 }
-/** Report photo URL (token in query so a plain <img> can load it). */
-export function reportPhotoUrl(id: string): string {
-  return `${BASE}/reports/${id}/photo?token=${getToken() ?? ''}`;
+/**
+ * Fetches a report photo with the Authorization header (no token in the URL,
+ * so it never lands in access logs or browser history) and returns an object
+ * URL for an <img src>. Caller must revokeObjectURL when done.
+ */
+export async function fetchReportPhoto(id: string): Promise<string> {
+  const token = getToken();
+  const res = await fetch(`${BASE}/reports/${id}/photo`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (res.status === 401) {
+    setToken(null);
+    throw new ApiError(401, 'Сессия истекла. Войдите снова.');
+  }
+  if (!res.ok) throw new ApiError(res.status, `Ошибка ${res.status}`);
+  return URL.createObjectURL(await res.blob());
 }
 
 // ── stats ──

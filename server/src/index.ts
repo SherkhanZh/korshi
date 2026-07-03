@@ -2,11 +2,11 @@ import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import path from 'path';
 import fs from 'fs';
 import { db, seed, neighborhoodName, createNeighborhood } from './db';
-import jwt from 'jsonwebtoken';
-import { signToken, requireAdmin, requireSuper, requireResident, requireUser, type AuthedRequest, type TokenPayload } from './auth';
+import { signToken, verifyToken, requireAdmin, requireSuper, requireResident, requireUser, type AuthedRequest } from './auth';
 import { sendToTokens, type PushMessage } from './push';
 
 seed();
@@ -20,8 +20,41 @@ app.use(express.json());
 const uploadsDir = path.join(process.cwd(), 'data', 'uploads');
 fs.mkdirSync(uploadsDir, { recursive: true });
 
+// ── Image upload safety ──
+// We ONLY accept real raster images and store them under a fixed, safe
+// extension derived from the file's magic bytes — never from the client-
+// supplied filename. This blocks uploading e.g. an .html/.svg that would then
+// be served from our origin as active content (stored XSS).
+const IMAGE_TYPES: Record<string, string> = {
+  '.jpg': 'image/jpeg',
+  '.png': 'image/png',
+  '.webp': 'image/webp',
+  '.gif': 'image/gif',
+};
+/** Detects a supported image from its leading bytes. Returns {ext,mime} or null. */
+function sniffImage(buf: Buffer): { ext: string; mime: string } | null {
+  if (buf.length < 12) return null;
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return { ext: '.jpg', mime: 'image/jpeg' };
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return { ext: '.png', mime: 'image/png' };
+  if (buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP') return { ext: '.webp', mime: 'image/webp' };
+  if (buf.toString('ascii', 0, 3) === 'GIF') return { ext: '.gif', mime: 'image/gif' };
+  return null;
+}
+/** Content-Type for a stored (already-validated) image filename. */
+function imageContentType(filename: string): string {
+  return IMAGE_TYPES[path.extname(filename).toLowerCase()] || 'application/octet-stream';
+}
+// First-line filter (cheap): reject anything not declaring an image mimetype.
+// The magic-byte sniff after upload is the authoritative check.
+const imageOnly = (_req: any, file: any, cb: any) =>
+  cb(null, /^image\/(jpe?g|png|webp|gif)$/i.test(file.mimetype));
+
 // Report photos are received in memory, then written with the new report id.
-const reportUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 12 * 1024 * 1024 } });
+const reportUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 12 * 1024 * 1024 },
+  fileFilter: imageOnly,
+});
 
 const q = (sql: string) => db.prepare(sql);
 const digits = (s: string) => (s || '').replace(/\D/g, '');
@@ -43,9 +76,29 @@ function rlPeek(key: string): number {
   return b && nowMs() <= b.reset ? b.count : 0;
 }
 function rlClear(key: string): void { _rl.delete(key); }
+/** True for loopback / RFC1918 / link-local addresses (our own proxy hops). */
+function isPrivateIp(ip: string): boolean {
+  const v = ip.replace(/^::ffff:/i, '');
+  return /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|::1$|f[cd][0-9a-f]{2}:|fe80:)/i.test(v) || v === 'localhost';
+}
+/**
+ * Real client IP for rate limiting. X-Forwarded-For is client-suppliable and
+ * our proxies (Caddy/nginx) APPEND to it, so the only trustworthy entries are
+ * the rightmost ones added by our own hops. Walk the chain from the right,
+ * skip our private-network proxy hops, and take the first address after them.
+ * Never trust the leftmost entry — that's whatever the client sent.
+ */
 function clientIp(req: any): string {
-  const fwd = (req.headers?.['x-forwarded-for'] as string | undefined)?.split(',')[0];
-  return (fwd || req.socket?.remoteAddress || 'unknown').trim();
+  const chain = String(req.headers?.['x-forwarded-for'] || '')
+    .split(',')
+    .map((s: string) => s.trim())
+    .filter(Boolean);
+  chain.push(req.socket?.remoteAddress || '');
+  for (let i = chain.length - 1; i >= 0; i--) {
+    if (chain[i] && !isPrivateIp(chain[i])) return chain[i];
+  }
+  // Everything private (local dev / same-host access) — use the socket peer.
+  return req.socket?.remoteAddress || 'unknown';
 }
 
 // All human-readable timestamps are rendered in the neighborhood's timezone.
@@ -235,9 +288,14 @@ app.post('/api/auth/resident/login', (req, res) => {
   const r = all.find((x) => last10(x.phone) === key);
   if (!r) return fail(404, 'Житель не найден. Обратитесь к председателю.');
 
+  // Once a resident has set a personal password, the invite code stops
+  // working — otherwise a leaked/guessed code is a permanent backdoor.
   let ok = false;
-  if (r.password_hash) ok = bcrypt.compareSync(secret, r.password_hash);
-  if (!ok && r.invite_code) ok = secret.toUpperCase() === String(r.invite_code).toUpperCase();
+  if (r.password_hash) {
+    ok = bcrypt.compareSync(secret, r.password_hash);
+  } else if (r.invite_code) {
+    ok = secret.toUpperCase() === String(r.invite_code).toUpperCase();
+  }
   if (!ok) return fail(401, 'Неверный код или пароль');
 
   rlClear(`login:ip:${ip}`);
@@ -257,7 +315,8 @@ app.post('/api/auth/resident/login', (req, res) => {
 app.post('/api/auth/resident/password', requireResident, (req: AuthedRequest, res) => {
   const pw = String(req.body?.password ?? '');
   if (pw.length < 4) return res.status(400).json({ error: 'Пароль слишком короткий' });
-  q('UPDATE residents SET password_hash=? WHERE id=?').run(bcrypt.hashSync(pw, 10), req.auth!.sub);
+  // Setting a password retires the invite code (it no longer grants login).
+  q('UPDATE residents SET password_hash=?, invite_code=NULL WHERE id=?').run(bcrypt.hashSync(pw, 10), req.auth!.sub);
   res.json({ ok: true });
 });
 
@@ -608,11 +667,13 @@ app.post('/api/reports', requireResident, reportUpload.single('image'), (req: Au
   const desc = String(description || '').trim();
   const id = `c${nowMs()}`;
   const reportTitle = desc || titles[category] || 'Обращение';
-  // Persist an attached photo (if any) as report_<id>.<ext>.
+  // Persist an attached photo (if any) as report_<id>.<ext>, where <ext> comes
+  // from the file's magic bytes — not its client-supplied name.
   let photo: string | null = null;
   if (req.file) {
-    const ext = path.extname(req.file.originalname || '').toLowerCase() || '.jpg';
-    photo = `report_${id}${ext}`;
+    const kind = sniffImage(req.file.buffer);
+    if (!kind) return res.status(400).json({ error: 'Файл не является изображением' });
+    photo = `report_${id}${kind.ext}`;
     fs.writeFileSync(path.join(uploadsDir, photo), new Uint8Array(req.file.buffer));
   }
   q(`INSERT INTO reports (id,neighborhood_id,resident_id,author,title,category,status,location,date_time,description,steps_json,detail_steps_json,updates_json,photo,created_at)
@@ -652,17 +713,14 @@ app.post('/api/reports', requireResident, reportUpload.single('image'), (req: Au
   res.status(201).json(reportDetail(q('SELECT * FROM reports WHERE id=?').get(id)));
 });
 
-// Report photo — token via Authorization header or ?token= (so <img> can load it).
-// Resident sees their own report's photo; neighborhood admin sees any in their area.
+// Report photo — auth via Authorization header only (both apps + the panel send
+// it that way; the token is never placed in the URL, so it can't leak into logs
+// or history). Resident sees their own report's photo; admin sees any in area.
 app.get('/api/reports/:id/photo', (req, res) => {
   const h = req.headers.authorization || '';
-  const raw = h.startsWith('Bearer ') ? h.slice(7) : String(req.query.token || '');
-  let payload: TokenPayload | null = null;
-  try {
-    payload = jwt.verify(raw, process.env.JWT_SECRET || 'korshi-dev-secret-change-me') as TokenPayload;
-  } catch {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
+  if (!h.startsWith('Bearer ')) return res.status(401).json({ error: 'unauthorized' });
+  const payload = verifyToken(h.slice(7));
+  if (!payload) return res.status(401).json({ error: 'unauthorized' });
   const r = q('SELECT * FROM reports WHERE id=?').get(req.params.id) as any;
   if (!r || !r.photo) return res.status(404).json({ error: 'no photo' });
   const allowed =
@@ -671,6 +729,9 @@ app.get('/api/reports/:id/photo', (req, res) => {
   if (!allowed) return res.status(403).json({ error: 'forbidden' });
   const p = path.join(uploadsDir, r.photo);
   if (!fs.existsSync(p)) return res.status(404).json({ error: 'no photo' });
+  res.type(imageContentType(r.photo));
+  res.setHeader('Content-Disposition', 'inline');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
   res.sendFile(p);
 });
 
@@ -891,8 +952,9 @@ app.post('/api/admin/residents/invite', requireAdmin, (req: AuthedRequest, res) 
   if (!phone || !address) return res.status(400).json({ error: 'phone and address required' });
   const exists = (q('SELECT * FROM residents').all() as any[]).some((r) => last10(r.phone) === last10(phone));
   if (exists) return res.status(409).json({ error: 'Этот номер уже зарегистрирован' });
-  // 4-digit numeric activation code (easy for elderly residents to type).
-  const code = String(Math.floor(1000 + Math.random() * 9000));
+  // 6-digit numeric activation code (still easy to type, but 10^6 combinations
+  // from a CSPRNG — with per-phone rate limiting, brute force is impractical).
+  const code = String(crypto.randomInt(100000, 1000000));
   const id = `res${nowMs()}`;
   q(`INSERT INTO residents (id,neighborhood_id,name,phone,address,street,status,invite_code,password_hash,created_at)
      VALUES (?,?,?,?,?,?,?,?,?,?)`).run(
@@ -1029,29 +1091,34 @@ function coverFile(nid: string): string | null {
   const f = fs.readdirSync(uploadsDir).find((n) => n.startsWith(`cover_${nid}.`));
   return f ? path.join(uploadsDir, f) : null;
 }
+// Cover uploads are buffered in memory so we can validate the magic bytes
+// before writing, and the stored extension comes from the sniff — never the
+// client filename.
 const upload = multer({
-  storage: multer.diskStorage({
-    destination: uploadsDir,
-    filename: (req, file, cb) => {
-      const nid = (req as AuthedRequest).auth!.nid!;
-      cb(null, `cover_${nid}${path.extname(file.originalname) || '.jpg'}`);
-    },
-  }),
+  storage: multer.memoryStorage(),
   limits: { fileSize: 12 * 1024 * 1024 },
+  fileFilter: imageOnly,
 });
 app.post('/api/neighborhood/cover', requireAdmin, upload.single('image'), (req: AuthedRequest, res) => {
   if (!req.file) return res.status(400).json({ error: 'image required' });
+  const kind = sniffImage(req.file.buffer);
+  if (!kind) return res.status(400).json({ error: 'Файл не является изображением' });
   const nid = req.auth!.nid!;
+  const filename = `cover_${nid}${kind.ext}`;
+  // Remove any previous cover (possibly a different extension) first.
   for (const n of fs.readdirSync(uploadsDir)) {
-    const p = path.join(uploadsDir, n);
-    if (n.startsWith(`cover_${nid}.`) && p !== req.file.path) fs.unlinkSync(p);
+    if (n.startsWith(`cover_${nid}.`)) fs.unlinkSync(path.join(uploadsDir, n));
   }
+  fs.writeFileSync(path.join(uploadsDir, filename), new Uint8Array(req.file.buffer));
   res.status(201).json({ ok: true });
 });
 app.get('/api/neighborhood/cover', (req, res) => {
   const nid = String(req.query.nid || '');
   const p = nid ? coverFile(nid) : null;
   if (!p || !fs.existsSync(p)) return res.status(404).json({ error: 'no cover' });
+  res.type(imageContentType(p));
+  res.setHeader('Content-Disposition', 'inline');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
   res.sendFile(p);
 });
 

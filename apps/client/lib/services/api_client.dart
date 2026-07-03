@@ -51,6 +51,12 @@ class ApiClient {
 
   /// Pulls the server's `{ "error": "..." }` message out of a failed response.
   Never _fail(http.Response res, String method, String path) {
+    // Expired/invalid session on an authenticated request: clear it so the app
+    // returns to onboarding (main.dart watches authToken).
+    if (res.statusCode == 401 && authToken.value != null) {
+      clearSession();
+      throw ApiException('Сессия истекла. Войдите снова.', statusCode: 401);
+    }
     String msg = 'Ошибка $method $path → ${res.statusCode}';
     try {
       final body = jsonDecode(utf8.decode(res.bodyBytes));

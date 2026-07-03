@@ -49,8 +49,28 @@ rsync -az --delete \
   deploy \
   "${SSH_USER}@${SERVER_IP}:${REMOTE_DIR}/"
 
-# 3) Build & (re)start the stack on the server.
-ssh "${SSH_USER}@${SERVER_IP}" "cd '${REMOTE_DIR}' && docker compose up -d --build && docker compose ps"
+# 3) Pick the right stack. If the server's .env declares a DOMAIN, it runs the
+#    HTTPS stack (Caddy) — deploying the plain-HTTP compose over it would knock
+#    out TLS and fight Caddy for port 80. Override with COMPOSE_FILE=... if needed.
+COMPOSE_FILE="${COMPOSE_FILE:-}"
+if [[ -z "$COMPOSE_FILE" ]]; then
+  if ssh "${SSH_USER}@${SERVER_IP}" "grep -qs '^DOMAIN=' '${REMOTE_DIR}/.env'"; then
+    COMPOSE_FILE="docker-compose.https.yml"
+  else
+    COMPOSE_FILE="docker-compose.yml"
+  fi
+fi
+echo "▶ Using ${COMPOSE_FILE}"
 
-echo "✓ Done. Open:  http://${SERVER_IP}/"
-echo "  API health:  http://${SERVER_IP}/api/health"
+# 4) Build & (re)start the stack on the server.
+ssh "${SSH_USER}@${SERVER_IP}" "cd '${REMOTE_DIR}' && docker compose -f '${COMPOSE_FILE}' up -d --build && docker compose -f '${COMPOSE_FILE}' ps"
+
+if [[ "$COMPOSE_FILE" == "docker-compose.https.yml" ]]; then
+  DOMAIN="$(ssh "${SSH_USER}@${SERVER_IP}" "grep '^DOMAIN=' '${REMOTE_DIR}/.env' | cut -d= -f2" || true)"
+  echo "✓ Done. Landing:  https://${DOMAIN:-<domain>}/"
+  echo "  Admin panel:    https://panel.${DOMAIN:-<domain>}/"
+  echo "  API health:     https://${DOMAIN:-<domain>}/api/health"
+else
+  echo "✓ Done. Open:  http://${SERVER_IP}/"
+  echo "  API health:  http://${SERVER_IP}/api/health"
+fi

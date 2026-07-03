@@ -111,6 +111,12 @@ class Api {
   }
 
   Never _fail(http.Response res, String method, String path) {
+    // An expired/invalid session on an authenticated request: drop it so the
+    // app returns to the login screen (main.dart watches adminToken).
+    if (res.statusCode == 401 && adminToken.value != null) {
+      clearSession();
+      throw ApiException('Сессия истекла. Войдите снова.', statusCode: 401);
+    }
     var msg = 'Ошибка $method $path → ${res.statusCode}';
     try {
       final b = jsonDecode(utf8.decode(res.bodyBytes));

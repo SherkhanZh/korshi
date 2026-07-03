@@ -32,18 +32,17 @@ ksk/
 
 ## Accounts
 
-The backend seeds a super admin, one neighborhood admin, and a few residents on
-first boot.
-
-- **Super admin (you):** `superadmin@korshi.kz` / `super123` — logs into the same
-  panel and gets a **Районы** screen to create neighborhoods. Creating a
-  neighborhood means: set its name + the neighborhood admin's login and password.
-- **Neighborhood admin:** `admin@korshi.kz` / `admin123` — manages one
-  neighborhood ("мкр Кок-Тобе"): its reports, residents, polls, announcements,
-  contacts and cover.
-- **Resident app:** phone `+7 777 123 45 67`, invite code `AB12-48` (residents log
-  in with phone + invite code; they may set a personal password, and the invite
-  code keeps working as a password until they do).
+- **Super admin (you):** seeded on first boot. Email is `SUPERADMIN_EMAIL`
+  (default `superadmin@korshi.kz`); password is `SUPERADMIN_PASSWORD`, or — if
+  unset — a random password generated and **printed once** in the server logs
+  (`docker compose logs api`). The super admin gets a **Районы** screen to
+  create neighborhoods (name + the neighborhood admin's login and password).
+- **Demo data** (admin `admin@korshi.kz`/`admin123`, sample residents, reports,
+  polls) is seeded only when `NODE_ENV != production`, or when `SEED_DEMO=1`
+  is set explicitly. Production boots clean.
+- **Residents** log in with phone + a 6-digit invite code generated when the
+  admin invites them. Once a resident sets a personal password, the invite
+  code stops working.
 
 ### Multi-neighborhood isolation
 
@@ -83,12 +82,26 @@ Firebase is configured (push just stays off until the config is present).
 
 ## Deployment
 
-Single Ubuntu host, Docker Compose, HTTP on port 80 (`web` = admin panel + `/api`
-proxy, `api` = backend). One-time: `deploy/server-setup.sh` on the box. Then:
+Single Ubuntu host, Docker Compose. One-time: `deploy/server-setup.sh` on the
+box (installs Docker, opens 80/443, installs the nightly backup cron). Then:
 
 ```bash
 ./deploy/deploy.sh <SERVER_IP>
 ```
+
+`deploy.sh` picks the stack automatically: if the server's `.env` sets
+`DOMAIN=…`, it deploys the HTTPS stack (Caddy + Let's Encrypt), otherwise the
+plain-HTTP one. Both require `JWT_SECRET` in `.env` (`openssl rand -hex 32`).
+
+With a domain, the public layout is:
+
+- `https://DOMAIN/` — landing page (`web/landing`: description, privacy
+  policy, public offer), served statically by Caddy
+- `https://DOMAIN/api` — backend API (what the mobile apps call)
+- `https://panel.DOMAIN/` — admin panel (add a DNS A record for `panel`)
+
+Backups: `deploy/backup.sh` runs nightly via cron, snapshots the SQLite DB
+(`VACUUM INTO`) plus uploads into `/var/backups/korshi`, and keeps 30 days.
 
 Full guide: [deploy/README.md](deploy/README.md).
 

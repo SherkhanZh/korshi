@@ -1,10 +1,44 @@
 # Caddy auto-provisions and renews HTTPS (Let's Encrypt) for $DOMAIN.
 # Set DOMAIN=your.domain in the .env next to docker-compose.https.yml, and point
-# that domain's DNS A record (and www) at this server. Caddy listens on 80 (ACME
-# + redirect) and 443 (TLS), proxying to the nginx `web` container which serves
-# the panel and reverse-proxies /api → the backend.
+# these DNS A records at this server: @ (root), www, and panel.
+#
+# Layout:
+#   $DOMAIN        → public landing page (+ /api proxied to the backend,
+#                    because the mobile apps call https://$DOMAIN/api)
+#   panel.$DOMAIN  → admin panel (nginx `web` container)
+#   www.$DOMAIN    → redirect to root
+
 {$DOMAIN} {
 	encode gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+
+	# Mobile apps talk to the API on the root domain.
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+
+	# Everything else: static landing (index, privacy, offer).
+	handle {
+		root * /srv/landing
+		file_server
+	}
+}
+
+# Admin panel on its own subdomain (add a DNS A record for panel.$DOMAIN).
+panel.{$DOMAIN} {
+	encode gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
 	reverse_proxy web:80
 }
 

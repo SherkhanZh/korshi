@@ -34,14 +34,19 @@ export function signToken(payload: TokenPayload): string {
   return jwt.sign(payload, SECRET, { expiresIn: '60d' });
 }
 
-function readToken(req: Request): TokenPayload | null {
-  const h = req.headers.authorization || '';
-  if (!h.startsWith('Bearer ')) return null;
+/** Verifies a raw JWT with the single shared secret. Returns null if invalid. */
+export function verifyToken(raw: string): TokenPayload | null {
   try {
-    return jwt.verify(h.slice(7), SECRET) as TokenPayload;
+    return jwt.verify(raw, SECRET) as TokenPayload;
   } catch {
     return null;
   }
+}
+
+function readToken(req: Request): TokenPayload | null {
+  const h = req.headers.authorization || '';
+  if (!h.startsWith('Bearer ')) return null;
+  return verifyToken(h.slice(7));
 }
 
 /** Neighborhood admin (scoped to one neighborhood via `req.auth.nid`). */
